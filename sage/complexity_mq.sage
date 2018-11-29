@@ -111,6 +111,9 @@ def quantum_hybrid( q, m, n ):
         alpha = 1.0 * N / M
         N = m - floor(alpha) + 1
         M = N
+
+    if M <= 1:
+        return 0, 0
     
     complexity = []
     for k in range(0, N):

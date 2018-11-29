@@ -9,7 +9,7 @@ def params_plain( q, v, o ):
     print "|pk| = ", pk, "bits =", (1.0*pk/8), "bytes =", (1.0*pk/8/1024), "kilobytes"
     print "|sig| = ", sig, "bits =", (1.0*sig/8), "bytes =", (1.0*sig/8/1024), "kilobytes"
 
-    print "Kipnis-Shamir:", log(1.0 * q^(v-o), 2.0)
+    print "Kipnis-Shamir:", log(1.0 * q^(v-o), 2.0) / 2
     c, k = quantum_hybrid(q, m, n)
     print "Direct Algebraic:", c, "with k =", k
     c, k = quantum_hybrid(q, m, v)
@@ -24,7 +24,7 @@ def params_pct( q, v, o ):
     print "|pk| = ", pk, "bits =", (1.0*pk/8), "bytes =", (1.0*pk/8/1024), "kilobytes"
     print "|sig| = ", sig, "bits =", (1.0*sig/8), "bytes =", (1.0*sig/8/1024), "kilobytes"
 
-    print "Kipnis-Shamir:", log(1.0 * q^(v-o), 2.0)
+    print "Kipnis-Shamir:", log(1.0 * q^(v-o), 2.0) / 2
     c, k = quantum_hybrid(q, m, n)
     print "Direct Algebraic:", c, "with k =", k
     c, k = quantum_hybrid(q, m, v)
@@ -39,7 +39,7 @@ def params_luov( q, v, o, r ):
     print "|pk| = ", pk, "bits =", (1.0*pk/8), "bytes =", (1.0*pk/8/1024), "kilobytes"
     print "|sig| = ", sig, "bits =", (1.0*sig/8), "bytes =", (1.0*sig/8/1024), "kilobytes"
 
-    print "Kipnis-Shamir:", log(1.0 * q^(v-o), 2.0)
+    print "Kipnis-Shamir:", log(1.0 * q^(v-o), 2.0) / 2
     c, k = quantum_hybrid(q^r, m, n)
     print "Direct Algebraic:", c, "with k =", k
     # pessimistic
@@ -60,10 +60,10 @@ def params_bac( q, V, O, l, r ):
     print "|pk| = ", pk, "bits =", (1.0*pk/8), "bytes =", (1.0*pk/8/1024), "kilobytes"
     print "|sig| = ", sig, "bits =", (1.0*sig/8), "bytes =", (1.0*sig/8/1024), "kilobytes"
 
-    print "Kipnis-Shamir:", log(1.0 * q^(V-O), 2.0)
+    print "Kipnis-Shamir:", log(1.0 * q^(V-O), 2.0) / 2
     c, k = quantum_hybrid(q^r, m, n)
     print "Direct Algebraic:", c, "with k =", k
-    c, k = quantum_hybrid(q, m, V)
+    c, k = quantum_hybrid(q, max(V,m), V)
     print "UOV Reconciliation:", c, "with k =", k
 
 
