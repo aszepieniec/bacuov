@@ -1,9 +1,22 @@
-import hashlib
 import binascii
+from CompactFIPS202 import SHAKE256, SHA3_256
 
 def hash_digest( m ):
-    ho = hashlib.sha256('1'+m)
-    return ho.hexdigest()
+    return binascii.hexlify(SHA3_256(bytearray('1'+m)))
+
+def sample_circulant_ring_element( R, buff ):
+    Fx = R.modulus().parent()
+    x = Fx.gen()
+    F = Fx.base_ring()
+    q = F.order()
+    d = R.modulus().degree()
+    integer = sum(256^i * buff[i] for i in range(0, len(buff)))
+    expansion = []
+    while integer > 0:
+        expansion.append(integer % q)
+        integer = floor(integer / q)
+    poly = sum(Fx(expansion[i]) * x^i for i in range(0, len(expansion)))
+    return R(poly)
 
 def hash_to_element( E, m ):
     hexmap = dict({'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'a': 10, 'b': 11, 'c': 12, 'd': 13, 'e': 14, 'f': 15})
@@ -34,12 +47,39 @@ def anticirculant_matrix( vector ):
         mat[-1,i] = mat[0,i-1]
     return mat
 
-def keygen( F, V, O, l ):
+class bacuov_secret_key:
+    def __init__( self, F, V, O, l ):
+        Fx.<x> = PolynomialRing(F, "x")
+        divisor = x^l - 1
+        QR = QuotientRing(Fx, divisor)
+        self.FF = [matrix([[QR.zero() for j in range(0, V+O)] for i in range(0, V+O)]) for k in range(0, O*l)]
+        self.S = matrix([[QR.zero() for j in range(0, O)] for i in range(0, V)])
+
+class bacuov_public_key:
+    def __init__( self, F, V, O, l ):
+        Fx.<x> = PolynomialRing(F, "x")
+        divisor = x^l - 1
+        QR = QuotientRing(Fx, divisor)
+        self.PP = [matrix([[QR.zero() for j in range(0, O)] for i in range(0, O)]) for k in range(0, O*l)]
+        self.seed_PCT = bytearray([0])
+
+def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     o = O * l
     v = V * l
     N = O + V
     n = o + v
     m = o
+
+    pk = bacuov_public_key(F, V, O, l)
+
+    # expand randomness into seeds
+    output = SHAKE256(randomness, 2*SECURITY_LEVEL/4)
+
+    # grab seed for S and for PCT
+    seed_S = output[0:(SECURITY_LEVEL/4)]
+    pk.seed_PCT = output[(SECURITY_LEVEL/4):]
+
+    print "PCT seed:", binascii.hexlify(pk.seed_PCT);
 
     # sample secret linear transform S
     VS = MatrixSpace(F, l, 1)
