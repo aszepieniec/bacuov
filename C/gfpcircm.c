@@ -348,7 +348,7 @@ int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix r
     #ifdef DEBUG
         if( dest->height != left.height || dest->width != right.width || left.width != right.height )
         {
-            printf("in gfpcircm_multiply: trying to multiply matrices with unmatched dimensions: %ix%i * %ix%i = %ix%i\n", left.height, left.width, right.height, right.width, dest.height, dest.width);
+            printf("in gfpcircm_multiply: trying to multiply matrices with unmatched dimensions: %ix%i * %ix%i = %ix%i\n", left.height, left.width, right.height, right.width, dest->height, dest->width);
             return 0;
         }
     #endif
@@ -410,7 +410,7 @@ int gfpcircm_multiply_transpose( gfpcircmatrix * dest, gfpcircmatrix left, gfpci
     #ifdef DEBUG
         if( dest->height != left.height || dest->width != rightT.height || left.width != rightT.width )
         {
-            printf("in gfpcircm_multiply_transpose: trying to multiply matrices with unmatched dimensions: %ix%i * (%ix%i)^T = %ix%i\n", left.height, left.width, rightT.height, rightT.width, dest.height, dest.width);
+            printf("in gfpcircm_multiply_transpose: trying to multiply matrices with unmatched dimensions: %ix%i * (%ix%i)^T = %ix%i\n", left.height, left.width, rightT.height, rightT.width, dest->height, dest->width);
             return 0;
         }
     #endif
@@ -479,9 +479,9 @@ int gfpcircm_transpose_multiply( gfpcircmatrix * dest, gfpcircmatrix leftT, gfpc
     lsum = gfpcirc_init(1);
 
     #ifdef DEBUG
-        if( dest.height != leftT.width || dest.width != right.width || leftT.height != right.height )
+        if( dest->height != leftT.width || dest->width != right.width || leftT.height != right.height )
         {
-            printf("in gfpcircm_transpose_multiply: trying to multiply matrices with unmatched dimensions: (%ix%i)^T * %ix%i = %ix%i\n", leftT.height, leftT.width, right.height, right.width, dest.height, dest.width);
+            printf("in gfpcircm_transpose_multiply: trying to multiply matrices with unmatched dimensions: (%ix%i)^T * %ix%i = %ix%i\n", leftT.height, leftT.width, right.height, right.width, dest->height, dest->width);
             return 0;
         }
     #endif

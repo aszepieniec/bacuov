@@ -36,12 +36,14 @@
 
 typedef struct
 {
-    unsigned char seed[SECURITY_LEVEL/4];
+    gfpcircmatrix FFvv[BACUOV_PARAM_M];
+    gfpcircmatrix FFvo[BACUOV_PARAM_M];
+    gfpcircmatrix S;
 } bacuov_secret_key;
 
 typedef struct
 {
-    gfpcirc_element PP[(BACUOV_PARAM_O+BACUOV_PARAM_V)*(BACUOV_PARAM_O+BACUOV_PARAM_V) * BACUOV_PARAM_M];
+    gfpcircmatrix PPoo[BACUOV_PARAM_M];
     unsigned char seed_PCT[SECURITY_LEVEL/4];
 } bacuov_public_key;
 
@@ -50,6 +52,11 @@ typedef struct
     gfpcirc_element vector[(BACUOV_PARAM_O+BACUOV_PARAM_V)];
 } bacuov_signature;
 
+
+void bacuov_secret_key_init( bacuov_secret_key * sk );
+void bacuov_secret_key_destroy( bacuov_secret_key sk );
+void bacuov_public_key_init( bacuov_public_key * sk );
+void bacuov_public_key_destroy( bacuov_public_key sk );
 void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned char * randomness );
 void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * msg, int msg_len );
 int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuov_signature * sig );

@@ -1,5 +1,7 @@
 #include "bacuov.h"
 
+#include <stdio.h>
+
 void FIPS202_SHAKE256(const unsigned char *input, unsigned int inputByteLen, unsigned char *output, int outputByteLen);
 void FIPS202_SHA3_256(const unsigned char *input, unsigned int inputByteLen, unsigned char *output);
 
@@ -12,7 +14,7 @@ void FIPS202_SHA3_256(const unsigned char *input, unsigned int inputByteLen, uns
  * Generate the secret matrix S, given
  * the seed for S.
  */
-void bacuov_generate_S( gfpcirc_element * data, unsigned char * seed_S )
+void bacuov_generate_S( gfpcircmatrix * data, unsigned char * seed_S )
 {
     unsigned char randomness[SECURITY_LEVEL/4 + sizeof(int)];
     int i, j, k;
@@ -41,7 +43,7 @@ void bacuov_generate_S( gfpcirc_element * data, unsigned char * seed_S )
     {
         for( j = 0 ; j < BACUOV_PARAM_O ; ++j )
         {
-            gfpcirc_sample(&data[i*BACUOV_PARAM_O + j], buffer + (k++)*sizeof(gfpcirc_element));
+            gfpcirc_random(&data->data[i*BACUOV_PARAM_O + j], buffer + (k++)*sizeof(gfpcirc_element));
         }
     }
 }
@@ -51,7 +53,7 @@ void bacuov_generate_S( gfpcirc_element * data, unsigned char * seed_S )
  * Generate the top-left VxV block of circulant ring elements of the
  * public quadratic form Pi.
  */
-void bacuov_generate_vinegar_coefficients( gfpcirc_element * Pi0V0V, unsigned char * seed, int index )
+void bacuov_generate_vinegar_coefficients( gfpcircmatrix * Pi0V0V, unsigned char * seed, int index )
 {
     unsigned char randomness[SECURITY_LEVEL/4 + sizeof(int) + sizeof(int)];
     int i, j, k;
@@ -81,13 +83,13 @@ void bacuov_generate_vinegar_coefficients( gfpcirc_element * Pi0V0V, unsigned ch
     k = 0;
     for( i = 0 ; i < BACUOV_PARAM_V ; ++i )
     {
-        gfpcirc_sample(&Pi0V0V[i*BACUOV_PARAM_V+i], buffer + (k++)*sizeof(gfpcirc_element));
+        gfpcirc_random(&Pi0V0V->data[i*BACUOV_PARAM_V+i], buffer + (k++)*sizeof(gfpcirc_element));
         for( j = i+1 ; j < BACUOV_PARAM_V ; ++j )
         {
-            gfpcirc_sample(&elm, buffer + (k++)*sizeof(gfpcirc_element));
+            gfpcirc_random(&elm, buffer + (k++)*sizeof(gfpcirc_element));
             // divide elm by 2? not necessary
-            gfpcirc_copy(&Pi0V0V[i*BACUOV_PARAM_V+j], elm);
-            gfpcirc_copy(&Pi0V0V[j*BACUOV_PARAM_V+i], elm);
+            gfpcirc_copy(&Pi0V0V->data[i*BACUOV_PARAM_V+j], elm);
+            gfpcirc_copy(&Pi0V0V->data[j*BACUOV_PARAM_V+i], elm);
         }
     }
 }
@@ -97,7 +99,7 @@ void bacuov_generate_vinegar_coefficients( gfpcirc_element * Pi0V0V, unsigned ch
  * Generate the top-right vinegar-oil part of the secret quadratic
  * form Pi.
  */
-void bacuov_generate_linear_coefficients( gfpcirc_element * Pi0VVN, unsigned char * seed, int index )
+void bacuov_generate_linear_coefficients( gfpcircmatrix * Pi0VVN, unsigned char * seed, int index )
 {
     unsigned char randomness[SECURITY_LEVEL/4 + sizeof(int) + sizeof(int)];
     int type;
@@ -127,8 +129,48 @@ void bacuov_generate_linear_coefficients( gfpcirc_element * Pi0VVN, unsigned cha
     {
         for( j = 0 ; j < BACUOV_PARAM_O ; ++j )
         {
-            gfpcirc_sample(&Pi0VVN[i*BACUOV_PARAM_O+j], buffer + (k++)*sizeof(gfpcirc_element));
+            gfpcirc_random(&Pi0VVN->data[i*BACUOV_PARAM_O+j], buffer + (k++)*sizeof(gfpcirc_element));
         }
+    }
+}
+
+void bacuov_secret_key_init( bacuov_secret_key * sk )
+{
+    int i;
+    sk->S = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
+    for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
+    {
+        sk->FFvv[i] = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
+        sk->FFvo[i] = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
+    }
+}
+
+void bacuov_secret_key_destroy( bacuov_secret_key sk )
+{
+    int i;
+    gfpcircm_destroy(sk.S);
+    for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
+    {
+        gfpcircm_destroy(sk.FFvv[i]);
+        gfpcircm_destroy(sk.FFvo[i]);
+    }
+}
+
+void bacuov_public_key_init( bacuov_public_key * pk )
+{
+    int i;
+    for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
+    {
+        pk->PPoo[i] = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_O);
+    }
+}
+
+void bacuov_public_key_destroy( bacuov_public_key pk )
+{
+    int i;
+    for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
+    {
+        gfpcircm_destroy(pk.PPoo[i]);
     }
 }
 
@@ -141,47 +183,18 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     int i, j, k;
     unsigned char buffer[SECURITY_LEVEL/4 + SECURITY_LEVEL/4];
     unsigned char seed_S[SECURITY_LEVEL/4];
-    gfpcirc_element Pi0V0V[BACUOV_PARAM_V * BACUOV_PARAM_V];
-    gfpcirc_element Fi0V0V[BACUOV_PARAM_V * BACUOV_PARAM_V];
-    gfpcirc_element Pi0VVN[BACUOV_PARAM_V * BACUOV_PARAM_O];
-    gfpcirc_element Fi0VVN[BACUOV_PARAM_V * BACUOV_PARAM_O];
-    gfpcirc_element S[BACUOV_PARAM_V * BACUOV_PARAM_O];
-    gfpcirc_element temp_data[BACUOV_PARAM_O * BACUOV_PARAM_O];
-    gfpcirc_element temp_data1[BACUOV_PARAM_O * BACUOV_PARAM_V];
-    gfpcircmatrix Pi0V0V_matrix, Pi0VVN_matrix;
-    gfpcircmatrix PiVNVN_matrix;
-    gfpcircmatrix Fi0V0V_matrix, Fi0VVN_matrix;
-    gfpcircmatrix S_matrix;
-    gfpcircmatrix temp_matrix, temp_matrix1;
+    gfpcircmatrix Pi0V0V, Pi0VVN;
+    gfpcircmatrix tempOV, tempOO;
 
     // initialize matrices
-    Pi0V0V_matrix.width = BACUOV_PARAM_V;
-    Pi0V0V_matrix.height = BACUOV_PARAM_V;
-    Pi0V0V_matrix.data = Pi0V0V;
-    Pi0VVN_matrix.width = BACUOV_PARAM_V;
-    Pi0VVN_matrix.height = BACUOV_PARAM_O;
-    Pi0VVN_matrix.data = Pi0VVN;
-    PiVNVN_matrix.width = BACUOV_PARAM_O;
-    PiVNVN_matrix.height = BACUOV_PARAM_O;
-    Fi0V0V_matrix.width = BACUOV_PARAM_V;
-    Fi0V0V_matrix.height = BACUOV_PARAM_V;
-    Fi0V0V_matrix.data = Fi0V0V;
-    Fi0VVN_matrix.width = BACUOV_PARAM_V;
-    Fi0VVN_matrix.height = BACUOV_PARAM_O;
-    Fi0VVN_matrix.data = Fi0VVN;
-    S_matrix.width = BACUOV_PARAM_O;
-    S_matrix.height = BACUOV_PARAM_V;
-    S_matrix.data = S;
-    temp_matrix.width = BACUOV_PARAM_O;
-    temp_matrix.height = BACUOV_PARAM_O;
-    temp_matrix.data = temp_data;
-    temp_matrix1.width = BACUOV_PARAM_V;
-    temp_matrix1.height = BACUOV_PARAM_O;
-    temp_matrix1.data = temp_data1;
-
+    Pi0V0V = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
+    Pi0VVN = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
+    tempOV = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_V);
+    tempOO = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_O);
 
     // expand randomness into seeds
     FIPS202_SHAKE256(randomness, SECURITY_LEVEL/4, buffer, 2*SECURITY_LEVEL/4);
+
 
     // grab seed for S and PCT
     for( i = 0 ; i < SECURITY_LEVEL/4 ; ++i )
@@ -191,34 +204,43 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     }
 
     // expand seed for S into S proper
-    bacuov_generate_S(S, seed_S);
+    bacuov_generate_S(&sk->S, seed_S);
 
     // for all m polynomials
     for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
     {
         // populate top-left and top-right blocks of Pi
-        bacuov_generate_vinegar_coefficients(Pi0V0V, pk->seed_PCT, i);
-        bacuov_generate_linear_coefficients(Pi0VVN, pk->seed_PCT, i);
+        bacuov_generate_vinegar_coefficients(&Pi0V0V, pk->seed_PCT, i);
+        bacuov_generate_linear_coefficients(&Pi0VVN, pk->seed_PCT, i);
 
         // copy Fi0V0V
-        gfpcircm_copy(Fi0V0V_matrix, Pi0V0V_matrix);
-        gfpcircm_flip(Fi0V0V_matrix);
+        gfpcircm_copy(sk->FFvv[i], Pi0V0V);
+        gfpcircm_flip(sk->FFvv[i]);
 
         // compute Fi0VVN
-        gfpcircm_multiply(&Fi0VVN_matrix, Pi0V0V_matrix, S_matrix);
-        gfpcircm_flip(Pi0VVN_matrix);
-        gfpcircm_add(Fi0VVN_matrix, Fi0VVN_matrix, Pi0VVN_matrix);
-        gfpcircm_flip(Pi0VVN_matrix);
+        gfpcircm_multiply(&sk->FFvo[i], Pi0V0V, sk->S);
+        gfpcircm_flip(Pi0VVN);
+        gfpcircm_add(sk->FFvo[i], sk->FFvo[i], Pi0VVN);
+        gfpcircm_flip(Pi0VVN);
 
         // compute PiVNVN
-        PiVNVN_matrix.data = pk->PP + sizeof(gfpcirc_element) * BACUOV_PARAM_O*BACUOV_PARAM_O * i;
-        gfpcircm_transpose_multiply(&temp_matrix1, S_matrix, Fi0V0V_matrix);
-        gfpcircm_multiply(&PiVNVN_matrix, temp_matrix1, S_matrix);
-        gfpcircm_transpose_multiply(&temp_matrix, S_matrix, Fi0VVN_matrix);
-        gfpcircm_flip(temp_matrix);
-        gfpcircm_add(PiVNVN_matrix, PiVNVN_matrix, temp_matrix);
-        gfpcircm_transpose(&temp_matrix);
-        gfpcircm_add(PiVNVN_matrix, PiVNVN_matrix, temp_matrix);
+        gfpcircm_transpose_multiply(&tempOV, sk->S, sk->FFvv[i]);
+        gfpcircm_multiply(&pk->PPoo[i], tempOV, sk->S);
+        gfpcircm_transpose_multiply(&tempOO, sk->S, sk->FFvo[i]);
+        gfpcircm_flip(tempOO);
+        gfpcircm_add(pk->PPoo[i], pk->PPoo[i], tempOO);
+        gfpcircm_transpose(&tempOO);
+        gfpcircm_add(pk->PPoo[i], pk->PPoo[i], tempOO);
     }
+
+
+    // destroy matrices
+    
+    gfpcircm_destroy(Pi0V0V);
+    gfpcircm_destroy(Pi0VVN);
+    gfpcircm_destroy(tempOV);
+    gfpcircm_destroy(tempOO);
+
+
 }
 

@@ -33,21 +33,28 @@ int main( int argc, char ** argv )
     {
         sscanf(argv[2] + 2*i, "%2hhx", &seed[i]);
     }
-    SHAKE256(seed, strlen(argv[2])/2, key_seed2, SECURITY_LEVEL/4);
+    FIPS202_SHAKE256(seed, strlen(argv[2])/2, key_seed2, SECURITY_LEVEL/4);
     free(seed);
 
     /* grab trial number */
     num_trials = atoi(argv[1]);
 
     /* run trials */
+    num_successes = 0;
+    num_failures = 0;
     for( trial_index = 0 ; trial_index < num_trials ; ++trial_index )
     {
-        SHAKE256(key_seed2, SECURITY_LEVEL/4, key_seed, SECURITY_LEVEL/4);
+        FIPS202_SHAKE256(key_seed2, SECURITY_LEVEL/4, key_seed, SECURITY_LEVEL/4);
+
         for( i = 0 ; i < SECURITY_LEVEL/4 ; ++i )
         {
             key_seed2[i] = key_seed[i];
         }
-        bacuov_keygen(&sk, &pk, seed);
+        bacuov_secret_key_init(&sk);
+        bacuov_public_key_init(&pk);
+        bacuov_keygen(&sk, &pk, key_seed);
+        bacuov_secret_key_destroy(sk);
+        bacuov_public_key_destroy(pk);
     }
 
     /* report on results */
