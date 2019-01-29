@@ -11,31 +11,47 @@
 // #endif
 
 #ifndef DEGREE_OF_CIRCULANCY
-#define DEGREE_OF_CIRCULANCY 11
+#define DEGREE_OF_CIRCULANCY 3
 #endif
 
-#define SEC_LVL 128
-#define BACUOV_PARAM_O 11
-#define BACUOV_PARAM_V 101
+#ifndef SECURITY_LEVEL
+#define SECURITY_LEVEL 256
+#endif
+
+#ifndef BACUOV_PARAM_O
+#define BACUOV_PARAM_O 2
+#endif
+
+#ifndef BACUOV_PARAM_V
+#define BACUOV_PARAM_V 7
+#endif
+
+#ifndef BACUOV_PARAM_M
 #define BACUOV_PARAM_M (BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY)
+#endif
+
+#include "gfp.h"
+#include "gfpcirc.h"
+#include "gfpcircm.h"
 
 typedef struct
 {
-    unsigned char seed[SEC_LVL/4];
+    unsigned char seed[SECURITY_LEVEL/4];
 } bacuov_secret_key;
 
 typedef struct
 {
-    gfpcirc_element forms_P[(BACUOV_PARAM_O+BAC_UOV_PARAM_V)*(BACUOV_PARAM_O+BAC_UOV_PARAM_V) * BACUOV_PARAM_M];
+    gfpcirc_element PP[(BACUOV_PARAM_O+BACUOV_PARAM_V)*(BACUOV_PARAM_O+BACUOV_PARAM_V) * BACUOV_PARAM_M];
+    unsigned char seed_PCT[SECURITY_LEVEL/4];
 } bacuov_public_key;
 
 typedef struct
 {
-    gfpcirc_element vector[(BACUOV_PARAM_O+BAC_UOV_PARAM_V)];
+    gfpcirc_element vector[(BACUOV_PARAM_O+BACUOV_PARAM_V)];
 } bacuov_signature;
 
-int bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned char * randomness );
-int bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * msg, int msg_len );
+void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned char * randomness );
+void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * msg, int msg_len );
 int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuov_signature * sig );
 
 #endif
