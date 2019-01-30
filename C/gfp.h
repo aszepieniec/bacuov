@@ -4,6 +4,7 @@
 #ifndef BIG
     
     #ifndef GF_PRIME_MODULUS
+    #warning "Prime modulus undefined; setting to 31."
     #define GF_PRIME_MODULUS 31
     #endif
     

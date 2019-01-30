@@ -34,9 +34,13 @@ int gfpcirc_destroy( gfpcirc_element elm )
     return 1;
 }
 
-int gfpcirc_copy( gfpcirc_element * dest, gfpcirc_element source )
+int gfpcirc_copy( gfpcirc_element * dest, gfpcirc_element * source )
 {
-    *dest = source;
+    int i;
+    for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        dest->data[i] = source->data[i];
+    }
     return 1;
 }
 
@@ -63,15 +67,16 @@ int gfpcirc_one( gfpcirc_element* elm )
 
 int gfpcirc_random( gfpcirc_element* elm, unsigned char * randomness )
 {
-    int i, j;
-    unsigned int r = 0;
+    int j;
+    unsigned long int r = 0; /* TODO: invoke big integer help if necessary */
+    for( j = 0 ; j < DEGREE_OF_CIRCULANCY * GFP_NUMBYTES ; ++j )
+    {
+        r = r * 256 + randomness[j];
+    }
     for( j = 0 ; j < DEGREE_OF_CIRCULANCY ; ++j )
     {
-        for( i = 0 ; i < GFP_NUMBYTES + 1 ; ++i )
-        {
-            r = r * 256 + randomness[i];
-        }
         elm->data[j] = r % GF_PRIME_MODULUS;
+        r = r / GF_PRIME_MODULUS;
     }
     return 1;
 }
@@ -171,19 +176,15 @@ int gfpcirc_multiply( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_elemen
     return 1;
 }
 
-int gfpcirc_print( gfpcirc_element elm )
+int gfpcirc_print( gfpcirc_element * elm )
 {
     int i;
-    printf("[");
+    printf("(");
     for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
-        if( (int)elm.data[i] > 10 )
-        {
-            printf("  ");
-        }
-        printf(" %i,", (int)elm.data[i]);
+        printf("%i,", (int)elm->data[i]);
     }
-    printf("]");
+    printf(")");
     return 1;
 }
 

@@ -16,11 +16,13 @@ void FIPS202_SHA3_256(const unsigned char *input, unsigned int inputByteLen, uns
  */
 void bacuov_generate_S( gfpcircmatrix * data, unsigned char * seed_S )
 {
-    unsigned char randomness[SECURITY_LEVEL/4 + sizeof(int)];
+    unsigned char randomness[SECURITY_LEVEL/4 + sizeof(unsigned int)];
     int i, j, k;
     int type;
     gfpcirc_element elm;
-    unsigned char buffer[sizeof(gfpcirc_element) * BACUOV_PARAM_V*BACUOV_PARAM_O];
+    unsigned char buffer[GFP_NUMBYTES * DEGREE_OF_CIRCULANCY * BACUOV_PARAM_V*BACUOV_PARAM_O];
+
+    printf("inside bacuov, degree of circulancy: %i\n", DEGREE_OF_CIRCULANCY);
     
     // copy over randomness
     for( i = 0 ; i < SECURITY_LEVEL/4 + sizeof(int) ; ++i )
@@ -35,7 +37,7 @@ void bacuov_generate_S( gfpcircmatrix * data, unsigned char * seed_S )
     }
 
     // expand seed to buffer of mucho pseudorandomness
-    FIPS202_SHAKE256(randomness, SECURITY_LEVEL/4 + sizeof(int), buffer, sizeof(gfpcirc_element) * BACUOV_PARAM_V*BACUOV_PARAM_O);
+    FIPS202_SHAKE256(randomness, SECURITY_LEVEL/4 + sizeof(unsigned int), buffer, GFP_NUMBYTES*DEGREE_OF_CIRCULANCY * BACUOV_PARAM_V*BACUOV_PARAM_O);
 
     // use pseudorandomness buffer to sample circulant ring elements
     k = 0;
@@ -43,9 +45,14 @@ void bacuov_generate_S( gfpcircmatrix * data, unsigned char * seed_S )
     {
         for( j = 0 ; j < BACUOV_PARAM_O ; ++j )
         {
-            gfpcirc_random(&data->data[i*BACUOV_PARAM_O + j], buffer + (k++)*sizeof(gfpcirc_element));
+            gfpcirc_random(&data->data[i*BACUOV_PARAM_O + j], buffer + (k++)*GFP_NUMBYTES*DEGREE_OF_CIRCULANCY);
         }
     }
+
+    printf("S:\n");
+    printf("%i x %i matrix (should be %i x %i)\n", data->height, data->width, BACUOV_PARAM_V, BACUOV_PARAM_O);
+    gfpcircm_print(*data);
+    printf("done with generating S.\n"); getchar();
 }
 
 /**
@@ -59,7 +66,7 @@ void bacuov_generate_vinegar_coefficients( gfpcircmatrix * Pi0V0V, unsigned char
     int i, j, k;
     int type;
     gfpcirc_element elm;
-    unsigned char buffer[sizeof(gfpcirc_element) * (BACUOV_PARAM_V * (BACUOV_PARAM_V + 1) / 2)];
+    unsigned char buffer[GFP_NUMBYTES*DEGREE_OF_CIRCULANCY * (BACUOV_PARAM_V * (BACUOV_PARAM_V + 1) / 2)];
     
     // copy over randomness
     for( i = 0 ; i < SECURITY_LEVEL/4 + sizeof(int) ; ++i )
@@ -77,21 +84,25 @@ void bacuov_generate_vinegar_coefficients( gfpcircmatrix * Pi0V0V, unsigned char
     randomness[SECURITY_LEVEL/4] = (unsigned char)-1;
 
     // expand seed to buffer of mucho pseudorandomness
-    FIPS202_SHAKE256(randomness, SECURITY_LEVEL/4 + sizeof(int)*2, buffer, sizeof(gfpcirc_element) * (BACUOV_PARAM_V * (BACUOV_PARAM_V + 1) / 2));
+    FIPS202_SHAKE256(randomness, SECURITY_LEVEL/4 + sizeof(int)*2, buffer, GFP_NUMBYTES*DEGREE_OF_CIRCULANCY * (BACUOV_PARAM_V * (BACUOV_PARAM_V + 1) / 2));
 
     // use pseudorandomness buffer to sample circulant ring elements
     k = 0;
     for( i = 0 ; i < BACUOV_PARAM_V ; ++i )
     {
-        gfpcirc_random(&Pi0V0V->data[i*BACUOV_PARAM_V+i], buffer + (k++)*sizeof(gfpcirc_element));
+        gfpcirc_random(&Pi0V0V->data[i*BACUOV_PARAM_V+i], buffer + (k++)*GFP_NUMBYTES*DEGREE_OF_CIRCULANCY);
         for( j = i+1 ; j < BACUOV_PARAM_V ; ++j )
         {
-            gfpcirc_random(&elm, buffer + (k++)*sizeof(gfpcirc_element));
+            gfpcirc_random(&elm, buffer + (k++)*GFP_NUMBYTES*DEGREE_OF_CIRCULANCY);
             // divide elm by 2? not necessary
-            gfpcirc_copy(&Pi0V0V->data[i*BACUOV_PARAM_V+j], elm);
-            gfpcirc_copy(&Pi0V0V->data[j*BACUOV_PARAM_V+i], elm);
+            gfpcirc_copy(&Pi0V0V->data[i*BACUOV_PARAM_V+j], &elm);
+            gfpcirc_copy(&Pi0V0V->data[j*BACUOV_PARAM_V+i], &elm);
         }
     }
+
+    printf("Pi[0:V,0:V]:\n");
+    gfpcircm_print(*Pi0V0V);
+    getchar();
 }
 
 /**
@@ -186,6 +197,13 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     gfpcircmatrix Pi0V0V, Pi0VVN;
     gfpcircmatrix tempOV, tempOO;
 
+    printf("inside keygen with randomness ");
+    for( i = 0 ; i < SECURITY_LEVEL/4 ; ++i )
+    {
+        printf("%02x", randomness[i]);
+    }
+    printf("\n");
+
     // initialize matrices
     Pi0V0V = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
     Pi0VVN = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
@@ -202,6 +220,10 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         seed_S[i] = buffer[i];
         pk->seed_PCT[i] = buffer[SECURITY_LEVEL/4 + i];
     }
+    printf("PCT seed: ");
+    for( i = 0 ; i < SECURITY_LEVEL / 4 ; ++i )
+        printf("%02x", pk->seed_PCT[i]);
+    printf("\n");
 
     // expand seed for S into S proper
     bacuov_generate_S(&sk->S, seed_S);
@@ -213,9 +235,14 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         bacuov_generate_vinegar_coefficients(&Pi0V0V, pk->seed_PCT, i);
         bacuov_generate_linear_coefficients(&Pi0VVN, pk->seed_PCT, i);
 
+        printf("got vinegar and linear coefficients.\n"); getchar();
+
         // copy Fi0V0V
         gfpcircm_copy(sk->FFvv[i], Pi0V0V);
+        printf("done with copying; now about to flip ..\n"); getchar();
         gfpcircm_flip(sk->FFvv[i]);
+
+        printf(" get Fi[0:V,0:V]\n"); getchar();
 
         // compute Fi0VVN
         gfpcircm_multiply(&sk->FFvo[i], Pi0V0V, sk->S);
@@ -241,6 +268,6 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     gfpcircm_destroy(tempOV);
     gfpcircm_destroy(tempOO);
 
-
+    getchar();
 }
 

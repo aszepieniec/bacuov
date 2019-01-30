@@ -4,6 +4,8 @@
 
 #include "bacuov.h"
 
+#define DEGREE_OF_CIRCULANCY 3
+
 void FIPS202_SHAKE256(const unsigned char *input, unsigned int inputByteLen, unsigned char *output, int outputByteLen);
 
 int main( int argc, char ** argv )
@@ -35,6 +37,11 @@ int main( int argc, char ** argv )
     }
     FIPS202_SHAKE256(seed, strlen(argv[2])/2, key_seed2, SECURITY_LEVEL/4);
     free(seed);
+
+    printf("set key seed: ");
+    for( i = 0 ; i < SECURITY_LEVEL/4 ; ++i )
+        printf("%02x", key_seed2[i]);
+    printf("\n");
 
     /* grab trial number */
     num_trials = atoi(argv[1]);
