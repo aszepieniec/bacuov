@@ -4,20 +4,6 @@ from CompactFIPS202 import SHAKE256, SHA3_256
 def hash_digest( m ):
     return binascii.hexlify(SHA3_256(bytearray('1'+m)))
 
-def sample_circulant_ring_element( R, buff ):
-    Fx = R.modulus().parent()
-    x = Fx.gen()
-    F = Fx.base_ring()
-    q = F.order()
-    d = R.modulus().degree()
-    integer = sum(256^i * buff[i] for i in range(0, len(buff)))
-    expansion = []
-    while integer > 0:
-        expansion.append(integer % q)
-        integer = floor(integer / q)
-    poly = sum(Fx(expansion[i]) * x^i for i in range(0, len(expansion)))
-    return R(poly)
-
 def hash_to_element( E, m ):
     hexmap = dict({'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'a': 10, 'b': 11, 'c': 12, 'd': 13, 'e': 14, 'f': 15})
     if E.is_prime_field():
@@ -70,7 +56,9 @@ def bacuov_sample_circulant_ring_element( QR, buff ):
     p = F.order()
     d = QR.modulus().degree()
 
-    integer = sum(256^i * buff[i] for i in range(0, len(buff)))
+    integer = 0
+    for i in range(0, len(buff)):
+        integer = integer*256 + buff[i]
 
     expansion = []
     while integer > 0:
@@ -80,17 +68,27 @@ def bacuov_sample_circulant_ring_element( QR, buff ):
     poly = sum(x^i * F(expansion[i]) for i in range(0, min(len(expansion), d)))
     return QR(poly)
 
-def bacuov_generate_S( QR, V, O, seed ):
-    l = QR.modulus().degree()
-    # append indicator
-    for i in range(0, 8):
-        seed += bytearray([int(0 >> (8*i))])
+def bacuov_print_circulant_ring_element( elm ):
+    d = elm.parent().modulus().degree()
+    F = elm.parent().modulus().parent().base_ring()
+    coeffs = elm.lift().coefficients(sparse=False)
+    while len(coeffs) != d:
+        coeffs.append(F.zero())
+    coeffs = [str(coeffs[i]) for i in range(0,len(coeffs))]
+    print "(" + ",".join(coeffs) + ")",
 
-    # expand
-    buff = SHAKE256(seed, l * V * O)
-
-    S = matrix([[bacuov_sample_circulant_ring_element(QR, buff[(l*(i*O+j)):(l*(i*O+j+1))]) for j in range(0, O)] for j in range(0, V)])
-    return S
+def bacuov_print_circulant_ring_matrix( mat ):
+    print "[",
+    for i in range(0, mat.nrows()):
+        if i != 0:
+            print " ",
+        print "[",
+        for j in range(0, mat.ncols()):
+            bacuov_print_circulant_ring_element(mat[i,j])
+        print "]",
+        if i != mat.nrows()-1:
+            print ""
+    print "]"
 
 def matrixify( qr_element ):
     QR = qr_element.parent()
@@ -111,6 +109,74 @@ def matrixify( qr_element ):
         mat[i,d-1] = mat[i-1,0]
 
     return mat
+
+def bacuov_generate_S( QR, V, O, seed ):
+    l = QR.modulus().degree()
+    # append indicator
+    for i in range(0, 4):
+        seed += bytearray([int(0 >> (8*i))])
+
+    # expand
+    buff = SHAKE256(seed, l * V * O)
+    print "buffer:", binascii.hexlify(buff)
+
+    S = matrix([[QR.zero() for j in range(0,O)] for j in range(0,V)])
+    k = 0;
+    for i in range(0, V):
+        for j in range(0, O):
+            S[i,j] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
+            k = k + 1
+
+    return S
+
+def bacuov_generate_vinegar_coefficients( QR, V, rand, index ):
+
+    l = QR.modulus().degree()
+    # append indicator
+    randomness = copy(rand)
+    for i in range(0, 4):
+        randomness += bytearray([int(1 >> (8*i))])
+    for i in range(0, 4):
+        randomness += bytearray([int((index >> (8*i)) % 256)])
+
+    # expand
+    buff = SHAKE256(randomness, l * V * (V+1) / 2)
+    #print "buffer:", binascii.hexlify(buff), "<-- got it!"
+
+    Pi = matrix([[QR.zero() for i in range(0,V)] for j in range(0,V)])
+    k = 0;
+    for i in range(0, V):
+        Pi[i,i] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
+        k = k + 1
+        for j in range(i+1, V):
+            Pi[i,j] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
+            Pi[j,i] = Pi[i,j]
+            k = k + 1
+
+    return Pi
+   
+def bacuov_generate_linear_coefficients( QR, V, O, rand, index ): 
+
+    l = QR.modulus().degree()
+    # append indicator
+    randomness = copy(rand)
+    for i in range(0, 4):
+        randomness += bytearray([int(2 >> (8*i))])
+    for i in range(0, 4):
+        randomness += bytearray([int((index >> (8*i)) % 256)])
+
+    # expand
+    buff = SHAKE256(randomness, l * V * O)
+    print "buffer:", binascii.hexlify(buff)
+
+    Pi = matrix([[QR.zero() for j in range(0,O)] for i in range(0,V)])
+    k = 0;
+    for i in range(0, V):
+        for j in range(0, O):
+            Pi[i,j] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
+            k = k + 1
+
+    return Pi
 
 def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     o = O * l
@@ -139,31 +205,39 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     # sample secret linear transform S
     VS = MatrixSpace(F, l, 1)
     S_top_right = bacuov_generate_S(QR, V, O, seed_S)
-    S_top_right = block_matrix([[matrixify(S_top_right[i,j]) for j in range(0, O)] for i in range(0, V)])
-    S = block_matrix([[MatrixSpace(F, v, v).zero(), S_top_right], [MatrixSpace(F, o, v).zero(), MatrixSpace(F, o, o).zero()]])
-    for i in range(0, N):
-	    for j in range(0, l):
-                S[i*l + l - 1 - j, i*l + j] = 1
+    S = block_matrix([[MatrixSpace(F, V, V).identity_matrix(), S_top_right], [MatrixSpace(F, O, V).zero(), MatrixSpace(F, O, O).identity_matrix()]])
+    S = block_matrix([[matrixify(S[i,j]) for j in range(0, N)] for i in range(0, N)])
 
-    # sample seed
-    seed = str(bytearray([ZZ(Integers(256).random_element()) for i in range(0, 32)]))
-
-    # prg all but lower-right of public quadratic rows
     PP = [copy(MatrixSpace(F, n, n).zero()) for k in range(0,m)]
-    for k in range(0, len(PP)):
-        for i in range(0, v+l-1):
-            if i % l == 0:
-                for j in range(i, n):
-                    PP[k][i,j] = hash_to_element(F, seed + "||" + "pk" + str(k) + "||" + str(i) + "||" + str(j))
-            else:
-                for j in range(i - (i%l), n):
-                    if j % l == l-1:
-                        PP[k][i,j] = PP[k][i-1,j-l+1]
-                    else:
-                        PP[k][i,j] = PP[k][i-1,j+1]
-        for i in range(0, n):
-            for j in range(0, i):
-                PP[k][i,j] = PP[k][j,i]
+    # loop over all m polynomials
+    for i in range(0,m):
+        # generate top left and top right blocks of Pi
+        Pi0V0V = bacuov_generate_vinegar_coefficients(QR, V, pk.seed_PCT, i)
+        Pi0VVN = bacuov_generate_linear_coefficients(QR, V, O, pk.seed_PCT, i)
+        print Pi0V0V.nrows(), "x", Pi0V0V.ncols(), ";", Pi0VVN.nrows(), "x", Pi0VVN.ncols()
+        Pi = block_matrix([[Pi0V0V, Pi0VVN], [Pi0VVN.transpose(), MatrixSpace(QR, O, O).zero()]])
+        print Pi.nrows(), "x", Pi.ncols(), ";", N, "x", N
+        print "Pi:\n", Pi
+        PP[i] = block_matrix([[matrixify(Pi[k,j]) for j in range(0, N)] for k in range(0, N)])
+
+    ## sample seed
+    #seed = str(bytearray([ZZ(Integers(256).random_element()) for i in range(0, 32)]))
+
+    ## prg all but lower-right of public quadratic rows
+    #for k in range(0, len(PP)):
+    #    for i in range(0, v+l-1):
+    #        if i % l == 0:
+    #            for j in range(i, n):
+    #                PP[k][i,j] = hash_to_element(F, seed + "||" + "pk" + str(k) + "||" + str(i) + "||" + str(j))
+    #        else:
+    #            for j in range(i - (i%l), n):
+    #                if j % l == l-1:
+    #                    PP[k][i,j] = PP[k][i-1,j-l+1]
+    #                else:
+    #                    PP[k][i,j] = PP[k][i-1,j+1]
+    #    for i in range(0, n):
+    #        for j in range(0, i):
+    #            PP[k][i,j] = PP[k][j,i]
 
     # shorthands
     S_ = S[0:v, v:n]
