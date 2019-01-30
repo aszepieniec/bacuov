@@ -63,6 +63,55 @@ class bacuov_public_key:
         self.PP = [matrix([[QR.zero() for j in range(0, O)] for i in range(0, O)]) for k in range(0, O*l)]
         self.seed_PCT = bytearray([0])
 
+def bacuov_sample_circulant_ring_element( QR, buff ):
+    Fx = QR.modulus().parent()
+    x = Fx.gen()
+    F = Fx.base_ring()
+    p = F.order()
+    d = QR.modulus().degree()
+
+    integer = sum(256^i * buff[i] for i in range(0, len(buff)))
+
+    expansion = []
+    while integer > 0:
+        expansion.append(integer % p)
+        integer = floor(integer / p)
+
+    poly = sum(x^i * F(expansion[i]) for i in range(0, min(len(expansion), d)))
+    return QR(poly)
+
+def bacuov_generate_S( QR, V, O, seed ):
+    l = QR.modulus().degree()
+    # append indicator
+    for i in range(0, 8):
+        seed += bytearray([int(0 >> (8*i))])
+
+    # expand
+    buff = SHAKE256(seed, l * V * O)
+
+    S = matrix([[bacuov_sample_circulant_ring_element(QR, buff[(l*(i*O+j)):(l*(i*O+j+1))]) for j in range(0, O)] for j in range(0, V)])
+    return S
+
+def matrixify( qr_element ):
+    QR = qr_element.parent()
+    modulus = QR.modulus()
+    d = modulus.degree()
+    Fx = modulus.parent()
+    F = Fx.base_ring()
+    MS = MatrixSpace(F, d, d)
+
+    coeffs = qr_element.lift().coefficients(sparse=False)
+
+    mat = copy(MS.zero())
+    for j in range(0, min(len(coeffs), d)):
+        mat[0,j] = coeffs[j]
+    for i in range(1, d):
+        for j in range(0, d-1):
+            mat[i,j] = mat[i-1,j+1];
+        mat[i,d-1] = mat[i-1,0]
+
+    return mat
+
 def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     o = O * l
     v = V * l
@@ -70,7 +119,13 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     n = o + v
     m = o
 
+    Fx = PolynomialRing(F, "x")
+    modulus = x^l - 1
+    QR = QuotientRing(Fx, modulus)
+
     pk = bacuov_public_key(F, V, O, l)
+
+    print "inside keygen with randomness", binascii.hexlify(randomness)
 
     # expand randomness into seeds
     output = SHAKE256(randomness, 2*SECURITY_LEVEL/4)
@@ -83,11 +138,12 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
 
     # sample secret linear transform S
     VS = MatrixSpace(F, l, 1)
-    S_top_right = block_matrix([[anticirculant_matrix(VS.random_element()) for i in range(0,O)] for j in range(0, V)])
+    S_top_right = bacuov_generate_S(QR, V, O, seed_S)
+    S_top_right = block_matrix([[matrixify(S_top_right[i,j]) for j in range(0, O)] for i in range(0, V)])
     S = block_matrix([[MatrixSpace(F, v, v).zero(), S_top_right], [MatrixSpace(F, o, v).zero(), MatrixSpace(F, o, o).zero()]])
     for i in range(0, N):
-	for j in range(0, l):
-            S[i*l + l - 1 - j, i*l + j] = 1
+	    for j in range(0, l):
+                S[i*l + l - 1 - j, i*l + j] = 1
 
     # sample seed
     seed = str(bytearray([ZZ(Integers(256).random_element()) for i in range(0, 32)]))
