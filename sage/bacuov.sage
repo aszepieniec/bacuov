@@ -110,6 +110,20 @@ def matrixify( qr_element ):
 
     return mat
 
+def flip( qr_element ):
+    QR = qr_element.parent()
+    modulus = QR.modulus()
+    d = modulus.degree()
+    Fx = modulus.parent()
+    F = Fx.base_ring()
+
+    coeffs = qr_element.lift().coefficients(sparse=False)
+    while len(coeffs) != d:
+        coeffs.append(F.zero())
+
+    coeffs = [coeffs[d-1-i] for i in range(0,d)]
+    return sum(QR(coeffs[i]) * QR.gen()^i for i in range(0, len(coeffs)))
+
 def bacuov_generate_S( QR, V, O, seed ):
     l = QR.modulus().degree()
     # append indicator
@@ -209,66 +223,102 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     S = block_matrix([[matrixify(S[i,j]) for j in range(0, N)] for i in range(0, N)])
 
     PP = [copy(MatrixSpace(F, n, n).zero()) for k in range(0,m)]
+    PPc = [copy(MatrixSpace(QR, N, N).zero()) for k in range(0,m)]
+    FFc = [copy(MatrixSpace(QR, N, N).zero()) for k in range(0,m)]
     # loop over all m polynomials
     for i in range(0,m):
         # generate top left and top right blocks of Pi
         Pi0V0V = bacuov_generate_vinegar_coefficients(QR, V, pk.seed_PCT, i)
         Pi0VVN = bacuov_generate_linear_coefficients(QR, V, O, pk.seed_PCT, i)
-        print Pi0V0V.nrows(), "x", Pi0V0V.ncols(), ";", Pi0VVN.nrows(), "x", Pi0VVN.ncols()
         Pi = block_matrix([[Pi0V0V, Pi0VVN], [Pi0VVN.transpose(), MatrixSpace(QR, O, O).zero()]])
-        print Pi.nrows(), "x", Pi.ncols(), ";", N, "x", N
-        print "Pi:\n", Pi
+        PPc[i] = Pi
         PP[i] = block_matrix([[matrixify(Pi[k,j]) for j in range(0, N)] for k in range(0, N)])
+        FFc[i][0:V, 0:V] = PPc[i][0:V, 0:V]
+        for j in range(0, V):
+            for k in range(0, V):
+                FFc[i][j,k] = flip(QR.gen()*FFc[i][j,k])
 
-    ## sample seed
-    #seed = str(bytearray([ZZ(Integers(256).random_element()) for i in range(0, 32)]))
+        FFc[i][0:V, V:N] = PPc[i][0:V, 0:V] * S_top_right
+        for j in range(0,V):
+            for k in range(V,N):
+                FFc[i][j,k] = flip(QR.gen()^2 * FFc[i][j,k])
 
-    ## prg all but lower-right of public quadratic rows
-    #for k in range(0, len(PP)):
-    #    for i in range(0, v+l-1):
-    #        if i % l == 0:
-    #            for j in range(i, n):
-    #                PP[k][i,j] = hash_to_element(F, seed + "||" + "pk" + str(k) + "||" + str(i) + "||" + str(j))
-    #        else:
-    #            for j in range(i - (i%l), n):
-    #                if j % l == l-1:
-    #                    PP[k][i,j] = PP[k][i-1,j-l+1]
-    #                else:
-    #                    PP[k][i,j] = PP[k][i-1,j+1]
-    #    for i in range(0, n):
-    #        for j in range(0, i):
-    #            PP[k][i,j] = PP[k][j,i]
+        mat = PPc[i][0:V, V:N] * QR.gen()
+        for j in range(0, V):
+            for k in range(0, O):
+                mat[j,k] = flip(mat[j,k])
 
-    # shorthands
-    S_ = S[0:v, v:n]
-    J = copy(MatrixSpace(F, l, l).zero())
-    for i in range(0, l):
-        J[i,l-1-i] = 1
-    Jo = copy(MatrixSpace(F, o, o).zero())
-    Jv = copy(MatrixSpace(F, v, v).zero())
-    JvS_Jo = Jv * S_ * Jo
-    for k in range(0, O):
-        Jo[k*l:(k+1)*l, k*l:(k+1)*l] = J
-    for k in range(0, V):
-        Jv[k*l:(k+1)*l, k*l:(k+1)*l] = J
+        FFc[i][0:V, V:N] = -FFc[i][0:V, V:N] + mat
+        FFc[i][V:N, 0:V] = FFc[i][0:V, V:N].transpose()
 
-    # infer secret quadratic forms and remaining part of public
-    FF = [copy(MatrixSpace(F, n, n).zero()) for i in range(0,m)]
-    for k in range(0, len(FF)):
-        FF[k][0:v, 0:v] = Jv * PP[k][0:v, 0:v] * Jv
-        FF[k][0:v, v:n] = -Jv * PP[k][0:v, 0:v] * Jv*S_*Jo + Jv * PP[k][0:v, v:n] * Jo
-        FF[k][v:n, 0:v] = -Jo * S_.transpose() * Jv * PP[k][0:v, 0:v] * Jv + Jo * PP[k][0:v, v:n].transpose() * Jv
-        PP[k][v:n, v:n] = S_.transpose() * FF[k][0:v, 0:v] * S_ + Jo * FF[k][v:n, 0:v] * S_ + S_.transpose() * FF[k][0:v, v:n] * Jo
+        mat = FFc[i][0:N, 0:N]
+        for j in range(0, N):
+            for k in range(0, N):
+                mat[j,k] = flip(mat[j,k]) * QR.gen()
+
+        temp = mat[V:N, 0:V] * S_top_right
+        for j in range(0, temp.nrows()):
+            for k in range(0, temp.ncols()):
+                temp[j,k] = temp[j,k] / QR.gen()
+
+        #PPc[i][V:N, V:N] = S_top_right.transpose() * mat[0:V, 0:V] * S_top_right + mat[V:N, 0:V] * S_top_right + S_top_right.transpose() * mat[0:V, V:N]
+        PPc[i][V:N, V:N] = S_top_right.transpose() * mat[0:V, 0:V] * S_top_right + temp.transpose() + temp
+    
+
+    ## explicit construction of redundant quadratic forms
+    ##
+    ### shorthands
+    ##S_ = S[0:v, v:n]
+    ##J = copy(MatrixSpace(F, l, l).zero())
+    ##for i in range(0, l):
+    ##    J[i,l-1-i] = 1
+    ##Jo = copy(MatrixSpace(F, o, o).zero())
+    ##Jv = copy(MatrixSpace(F, v, v).zero())
+    ##JvS_Jo = Jv * S_ * Jo
+    ##for k in range(0, O):
+    ##    Jo[k*l:(k+1)*l, k*l:(k+1)*l] = J
+    ##for k in range(0, V):
+    ##    Jv[k*l:(k+1)*l, k*l:(k+1)*l] = J
+
+    ### infer secret quadratic forms and remaining part of public
+    ##FF = [copy(MatrixSpace(F, n, n).zero()) for i in range(0,m)]
+    ##for k in range(0, len(FF)):
+    ##    FF[k][0:v, 0:v] = Jv * PP[k][0:v, 0:v] * Jv
+    ##    FF[k][0:v, v:n] = -Jv * PP[k][0:v, 0:v] * Jv*S_*Jo + Jv * PP[k][0:v, v:n] * Jo
+    ##    FF[k][v:n, 0:v] = -Jo * S_.transpose() * Jv * PP[k][0:v, 0:v] * Jv + Jo * PP[k][0:v, v:n].transpose() * Jv
+    ##    PP[k][v:n, v:n] = S_.transpose() * FF[k][0:v, 0:v] * S_ + Jo * FF[k][v:n, 0:v] * S_ + S_.transpose() * FF[k][0:v, v:n] * Jo
+
+    ##for k in range(0, len(FF)):
+    ##    mat = block_matrix([[matrixify(FFc[k][i,j]) for j in range(0, N)] for i in range(0, N)])
+    ##    if mat != FF[k]:
+    ##        print "error at k =", k
+    ##        print "FFc[k]:"
+    ##        print FFc[k]
+    ##        print "whereas FF[k]:"
+    ##        print FF[k]
+    ##        return
+
+    ##    mat = block_matrix([[matrixify(PPc[k][i,j]) for j in range(0, N)] for i in range(0, N)])
+    ##    if mat != PP[k]:
+    ##        print "error at k =", k
+    ##        print "PPc[k]:"
+    ##        print PPc[k]
+    ##        print "whereas PP[k]:"
+    ##        print PP[k]
+    ##        return
+
+
+    ##print "suucceeeessss \\o/"
 
     # compress public polynomials -- take out every block's first row
     oiloil = []
-    for k in range(0, len(PP)):
-        for i in range(v, n):
+    for k in range(0, len(PPc)):
+        for i in range(V, N):
             if i % l == 0:
-                for j in range(i, n):
-                    oiloil.append(PP[k][i,j])
+                for j in range(i, N):
+                    oiloil.append(PPc[k][i,j])
 
-    return (FF, S), (seed, oiloil, l, m, n)
+    return (FFc, S_top_right), (seed, oiloil, l, m, n)
 
 def sign( E, sk, doc ):
     FF, S = sk

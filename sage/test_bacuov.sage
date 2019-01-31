@@ -12,7 +12,7 @@ def test( num_trials, seed ):
     F = FiniteField(7)
     V = 7
     O = 2
-    l = 3
+    l = 4
 
     num_successes = 0
     num_integrity_failures = 0
