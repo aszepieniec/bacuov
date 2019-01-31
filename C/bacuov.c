@@ -51,10 +51,9 @@ void bacuov_generate_S( gfpcircmatrix * data, unsigned char * seed_S )
         }
     }
 
-    printf("S:\n");
-    printf("%i x %i matrix (should be %i x %i)\n", data->height, data->width, BACUOV_PARAM_V, BACUOV_PARAM_O);
-    gfpcircm_print(*data);
-    printf("done with generating S.\n"); getchar();
+    //printf("S:\n");
+    //printf("%i x %i matrix (should be %i x %i)\n", data->height, data->width, BACUOV_PARAM_V, BACUOV_PARAM_O);
+    //gfpcircm_print(*data);
 }
 
 /**
@@ -242,11 +241,9 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         bacuov_generate_vinegar_coefficients(&Pi0V0V, pk->seed_PCT, i);
         bacuov_generate_linear_coefficients(&Pi0VVN, pk->seed_PCT, i);
 
-
         // copy Fi0V0V
         gfpcircm_copy(sk->FFvv[i], Pi0V0V);
         gfpcircm_flip(sk->FFvv[i]);
-
 
         // compute Fi0VVN
         gfpcircm_multiply(&sk->FFvo[i], Pi0V0V, sk->S);
@@ -272,6 +269,5 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     gfpcircm_destroy(tempOV);
     gfpcircm_destroy(tempOO);
 
-    getchar();
 }
 

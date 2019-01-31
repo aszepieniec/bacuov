@@ -9,7 +9,7 @@
     #endif
     
     #ifndef GFP_NUMBITS
-    #define GFP_NUMBITS 5
+    #define GFP_NUMBITS 3
     #endif
     
     #ifndef GFP_NUMBYTES

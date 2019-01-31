@@ -49,14 +49,6 @@ gfpcircmatrix gfpcircm_init( unsigned  int height, unsigned  int width )
  */
 int gfpcircm_destroy( gfpcircmatrix fm )
 {
-    int i, j;
-    for( i = 0 ; i < fm.height ; ++i )
-    {
-        for( j = 0 ; j < fm.width ; ++j )
-        {
-            gfpcirc_destroy(fm.data[i*fm.width + j]);
-        }
-    }
     free(fm.data);
     fm.width = 0;
     fm.height = 0;
@@ -326,7 +318,7 @@ int gfpcircm_transpose( gfpcircmatrix * trans )
 int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix right )
 {
     unsigned  int i, j, k;
-    gfpcirc_element prod, sum, lsum;
+    gfpcirc_element prod, sum, lsum, lhs, rhs;
     gfpcirc_element * data;
 
     prod = gfpcirc_init(1);
@@ -358,7 +350,9 @@ int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix r
             for( k = 0 ; k < left.width ; ++k )
             {
                 gfpcirc_copy(&lsum, &sum);
-                gfpcirc_multiply(&prod, left.data[i*left.width + k], right.data[k*right.width + j]);
+                lhs = left.data[i*left.width + k];
+                rhs = right.data[k*right.width + j];
+                gfpcirc_multiply(&prod, lhs, rhs);
                 gfpcirc_add(&sum, lsum, prod);
             }
             gfpcirc_copy(&data[i*dest->width + j], &sum);
@@ -369,7 +363,8 @@ int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix r
     {
         for( j = 0 ; j < dest->width ; ++j )
         {
-            gfpcirc_destroy(dest->data[i*dest->width + j]);
+            lhs = dest->data[i*dest->width + j];
+            gfpcirc_destroy(lhs);
         }
     }
     free(dest->data);
@@ -468,7 +463,7 @@ int gfpcircm_multiply_transpose( gfpcircmatrix * dest, gfpcircmatrix left, gfpci
 int gfpcircm_transpose_multiply( gfpcircmatrix * dest, gfpcircmatrix leftT, gfpcircmatrix right )
 {
     unsigned  int i, j, k;
-    gfpcirc_element prod, sum, lsum;
+    gfpcirc_element prod, sum, lsum, rhs, lhs;
     gfpcirc_element * data;
 
     prod = gfpcirc_init(1);
@@ -500,7 +495,9 @@ int gfpcircm_transpose_multiply( gfpcircmatrix * dest, gfpcircmatrix leftT, gfpc
             for( k = 0 ; k < leftT.height ; ++k )
             {
                 gfpcirc_copy(&lsum, &sum);
-                gfpcirc_multiply(&prod, leftT.data[k*leftT.width + i], right.data[k*right.width + j]);
+                lhs = leftT.data[k*leftT.width + i];
+                rhs = right.data[k*right.width + j];
+                gfpcirc_multiply(&prod, lhs, rhs);
                 gfpcirc_add(&sum, lsum, prod);
             }
             gfpcirc_copy(&data[i*dest->width + j], &sum);
@@ -511,7 +508,8 @@ int gfpcircm_transpose_multiply( gfpcircmatrix * dest, gfpcircmatrix leftT, gfpc
     {
         for( j = 0 ; j < dest->width ; ++j )
         {
-            gfpcirc_destroy(dest->data[i*dest->width + j]);
+            lhs = dest->data[i*dest->width + j];
+            gfpcirc_destroy(lhs);
         }
     }
     free(dest->data);
@@ -567,6 +565,7 @@ int gfpcircm_multiply_constant( gfpcircmatrix dest, gfpcircmatrix source, gfpcir
 int gfpcircm_add( gfpcircmatrix dest, gfpcircmatrix left, gfpcircmatrix right )
 {
     unsigned  int i, j;
+    gfpcirc_element lhs, rhs;
 
     #ifdef DEBUG
         if( dest.width != left.width || left.width != right.width || dest.height != left.height || left.height != right.height )
@@ -580,7 +579,9 @@ int gfpcircm_add( gfpcircmatrix dest, gfpcircmatrix left, gfpcircmatrix right )
     {
         for( j = 0 ; j < dest.width ; ++j )
         {
-            gfpcirc_add(&dest.data[i*dest.width + j], left.data[i*left.width + j], right.data[i*right.width + j]);
+            lhs = left.data[i*left.width + j];
+            rhs = right.data[i*right.width + j];
+            gfpcirc_add(&dest.data[i*dest.width + j], lhs, rhs);
         }
     }
 
