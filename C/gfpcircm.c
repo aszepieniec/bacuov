@@ -642,22 +642,75 @@ int gfpcircm_weighted_sum( gfpcircmatrix dest, gfpcirc_element left_constant, gf
 int gfpcircm_flip( gfpcircmatrix mat )
 {
     unsigned int i, j;
-    int k;
+    for( i = 0 ; i < mat.height ; ++i )
+    {
+        for( j = 0 ; j < mat.width ; ++j )
+        {
+            gfpcirc_flip(&mat.data[i*mat.width + j]);
+        }
+    }
+}
+
+int gfpcircm_shift( gfpcircmatrix mat, int shamt )
+{
+    unsigned int i, j;
+    for( i = 0 ; i < mat.height ; ++i )
+    {
+        for( j = 0 ; j < mat.width ; ++j )
+        {
+            gfpcirc_shift(&mat.data[i*mat.width + j], shamt);
+        }
+    }
+}
+
+int gfpcircm_flipshift( gfpcircmatrix mat, int shamt )
+{
+    unsigned int i, j;
     gfpcirc_element elm;
     for( i = 0 ; i < mat.height ; ++i )
     {
         for( j = 0 ; j < mat.width ; ++j )
         {
-            for( k = 0 ; k < DEGREE_OF_CIRCULANCY-1 ; ++k )
-            {
-                elm.data[k] = mat.data[i*mat.width + j].data[k];
-            }
-            for( k = 0 ; k < DEGREE_OF_CIRCULANCY-1 ; ++k )
-            {
-                mat.data[i*mat.width + j].data[k] = elm.data[DEGREE_OF_CIRCULANCY-1-k];
-            }
+            gfpcirc_copy(&elm, &mat.data[i*mat.width + j]);
+            gfpcirc_flip(&elm);
+            gfpcirc_shift(&elm, shamt);
+            gfpcirc_copy(&mat.data[i*mat.width + j], &elm);
         }
     }
+    return 1; 
+}
+
+int gfpcircm_shiftflip( gfpcircmatrix mat, int shamt )
+{
+    unsigned int i, j;
+    gfpcirc_element elm;
+
+    for( i = 0 ; i < mat.height ; ++i )
+    {
+        for( j = 0 ; j < mat.width ; ++j )
+        {
+            gfpcirc_copy(&elm, &mat.data[i*mat.width + j]);
+            gfpcirc_shift(&elm, shamt);
+            gfpcirc_flip(&elm);
+            gfpcirc_copy(&mat.data[i*mat.width + j], &elm);
+        }
+    }
+    return 1; 
+}
+
+int gfpcircm_negate( gfpcircmatrix mat )
+{
+    unsigned int i, j;
+    gfpcirc_element elm;
+    for( i = 0 ; i < mat.height ; ++i )
+    {
+        for( j = 0 ; j < mat.width ; ++j )
+        {
+            gfpcirc_negate(&elm, mat.data[i*mat.width + j]);
+            gfpcirc_copy(&mat.data[i*mat.width + j], &elm);
+        }
+    }
+    return 1;
 }
 
 /**
@@ -774,10 +827,14 @@ int gfpcircm_slice( gfpcircmatrix dest, gfpcircmatrix source, unsigned  int row_
 int gfpcircm_print( gfpcircmatrix mat )
 {
     unsigned int i, j;
-    printf("[");
+    printf("[ ");
     for( i = 0 ; i < mat.height ; ++i )
     {
-        printf("[");
+        if( i != 0 )
+        {
+            printf("  ");
+        }
+        printf("[ ");
         for( j = 0 ; j < mat.width ; ++j )
         {
             gfpcirc_print(&mat.data[i*mat.width+j]);
@@ -787,14 +844,14 @@ int gfpcircm_print( gfpcircmatrix mat )
                 printf(" ");
             }
         }
-        printf("]");
+        printf(" ]");
         if( i < mat.height - 1 )
         {
             printf(",");
             printf("\n");
         }
     }
-    printf("]\n");
+    printf(" ]\n");
 }
 
 /**

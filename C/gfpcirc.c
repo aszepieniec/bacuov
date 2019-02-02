@@ -149,7 +149,7 @@ int gfpcirc_negate( gfpcirc_element * res, gfpcirc_element elm )
     int i;
     for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
-        res->data[i] = GF_PRIME_MODULUS - (int)(elm.data[i]);
+        res->data[i] = (GF_PRIME_MODULUS - (int)(elm.data[i])) % GF_PRIME_MODULUS;
     }
     return 1;
 }
@@ -166,13 +166,59 @@ int gfpcirc_multiply( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_elemen
     {
         for( j = 0 ; j < DEGREE_OF_CIRCULANCY ; ++j )
         {
-            data[i+j] = (lhs.data[i] + rhs.data[j]) % GF_PRIME_MODULUS;
+            data[i+j] = (data[i+j] + (lhs.data[i] * rhs.data[j])) % GF_PRIME_MODULUS;
         }
     }
     /* reduce modulo x^l-1 */
     for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
         res->data[i] = ((int)data[i] + (int)data[DEGREE_OF_CIRCULANCY+i]) % GF_PRIME_MODULUS;
+    }
+
+    return 1;
+}
+
+int gfpcirc_flip( gfpcirc_element * elm )
+{
+    int i;
+    gfpcirc_element temp;
+    for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        temp.data[i] = elm->data[i];
+    }
+    for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        elm->data[DEGREE_OF_CIRCULANCY-1-i] = temp.data[i];
+    }
+    return 1;
+}
+
+int gfpcirc_shift( gfpcirc_element * elm, int shamt )
+{
+    int i;
+    gfpcirc_element temp;
+    
+    if( shamt == 0 )
+    {
+        return 1;
+    }
+    if( shamt < 0 )
+    {
+        i = (-shamt) / DEGREE_OF_CIRCULANCY;
+        return gfpcirc_shift(elm, (i+1)*DEGREE_OF_CIRCULANCY + shamt);
+    }
+    if( shamt > DEGREE_OF_CIRCULANCY )
+    {
+        return gfpcirc_shift(elm, shamt % DEGREE_OF_CIRCULANCY);
+    }
+
+    for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        temp.data[i] = elm->data[i];
+    }
+    for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        elm->data[(i+shamt) % DEGREE_OF_CIRCULANCY] = temp.data[i];
     }
     return 1;
 }

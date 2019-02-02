@@ -201,7 +201,7 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     unsigned char buffer[SECURITY_LEVEL/4 + SECURITY_LEVEL/4];
     unsigned char seed_S[SECURITY_LEVEL/4];
     gfpcircmatrix Pi0V0V, Pi0VVN;
-    gfpcircmatrix tempOV, tempOO;
+    gfpcircmatrix tempVV, tempVO, tempOV, matVO, matOO;
 
     printf("inside keygen with randomness ");
     for( i = 0 ; i < SECURITY_LEVEL/4 ; ++i )
@@ -213,8 +213,11 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     // initialize matrices
     Pi0V0V = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
     Pi0VVN = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
+    tempVV = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
+    tempVO = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
     tempOV = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_V);
-    tempOO = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_O);
+    matVO = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
+    matOO = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_O);
 
     // expand randomness into seeds
     FIPS202_SHAKE256(randomness, SECURITY_LEVEL/4, buffer, 2*SECURITY_LEVEL/4);
@@ -234,6 +237,7 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     // expand seed for S into S proper
     bacuov_generate_S(&sk->S, seed_S);
 
+
     // for all m polynomials
     for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
     {
@@ -241,33 +245,56 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         bacuov_generate_vinegar_coefficients(&Pi0V0V, pk->seed_PCT, i);
         bacuov_generate_linear_coefficients(&Pi0VVN, pk->seed_PCT, i);
 
-        // copy Fi0V0V
+        // copy FF[i][0:V,0:V]
         gfpcircm_copy(sk->FFvv[i], Pi0V0V);
-        gfpcircm_flip(sk->FFvv[i]);
+        gfpcircm_shiftflip(sk->FFvv[i],1);
 
-        // compute Fi0VVN
+        // compute FF[i][0:V,V:N]
         gfpcircm_multiply(&sk->FFvo[i], Pi0V0V, sk->S);
-        gfpcircm_flip(Pi0VVN);
-        gfpcircm_add(sk->FFvo[i], sk->FFvo[i], Pi0VVN);
-        gfpcircm_flip(Pi0VVN);
+        gfpcircm_shiftflip(sk->FFvo[i],2);
+        gfpcircm_negate(sk->FFvo[i]);
 
-        // compute PiVNVN
-        gfpcircm_transpose_multiply(&tempOV, sk->S, sk->FFvv[i]);
+        gfpcircm_copy(matVO, Pi0VVN);
+        gfpcircm_shiftflip(matVO, 1);
+        gfpcircm_add(sk->FFvo[i], sk->FFvo[i], matVO);
+
+        // compute PP[i][V:N,V:N]
+        gfpcircm_transpose(&sk->S);
+        gfpcircm_copy(tempVO, sk->FFvo[i]);
+        gfpcircm_flip(tempVO);
+        gfpcircm_multiply(&matOO, sk->S, tempVO);
+        gfpcircm_transpose(&matOO);
+
+        gfpcircm_copy(tempVV, sk->FFvv[i]);
+        gfpcircm_flipshift(tempVV, 1);
+        gfpcircm_multiply(&tempOV, sk->S, tempVV);
+        gfpcircm_transpose(&sk->S);
         gfpcircm_multiply(&pk->PPoo[i], tempOV, sk->S);
-        gfpcircm_transpose_multiply(&tempOO, sk->S, sk->FFvo[i]);
-        gfpcircm_flip(tempOO);
-        gfpcircm_add(pk->PPoo[i], pk->PPoo[i], tempOO);
-        gfpcircm_transpose(&tempOO);
-        gfpcircm_add(pk->PPoo[i], pk->PPoo[i], tempOO);
+
+        gfpcircm_add(pk->PPoo[i], pk->PPoo[i], matOO);
+        gfpcircm_transpose(&matOO);
+        gfpcircm_add(pk->PPoo[i], pk->PPoo[i], matOO);
+        gfpcircm_transpose(&matOO);
     }
 
+    /*
+    printf("FF[0][0:V, 0:V]:\n");
+    gfpcircm_print(sk->FFvv[0]);
+    printf("FF[0][0:V, V:N]:\n");
+    gfpcircm_print(sk->FFvo[0]);
+    printf("PP[0][V:N, V:N]:\n");
+    gfpcircm_print(pk->PPoo[0]);
+    */
 
     // destroy matrices
     
     gfpcircm_destroy(Pi0V0V);
     gfpcircm_destroy(Pi0VVN);
+    gfpcircm_destroy(tempVV);
+    gfpcircm_destroy(tempVO);
     gfpcircm_destroy(tempOV);
-    gfpcircm_destroy(tempOO);
+    gfpcircm_destroy(matOO);
+    gfpcircm_destroy(matVO);
 
 }
 

@@ -29,6 +29,8 @@ int gfpcirc_subtract( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_elemen
 int gfpcirc_negate( gfpcirc_element * res, gfpcirc_element elm );
 int gfpcirc_multiply( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_element rhs );
 int gfpcirc_divide( gfpcirc_element * quo, gfpcirc_element numerator, gfpcirc_element divisor );
+int gfpcirc_flip( gfpcirc_element * elm );
+int gfpcirc_shift( gfpcirc_element * elm, int shamt );
 int gfpcirc_print( gfpcirc_element * elm );
 int gfpcirc_is_one( gfpcirc_element elm );
 int gfpcirc_is_zero( gfpcirc_element elm );

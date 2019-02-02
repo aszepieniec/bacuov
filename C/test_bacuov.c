@@ -4,8 +4,6 @@
 
 #include "bacuov.h"
 
-#define DEGREE_OF_CIRCULANCY 3
-
 void FIPS202_SHAKE256(const unsigned char *input, unsigned int inputByteLen, unsigned char *output, int outputByteLen);
 
 int main( int argc, char ** argv )

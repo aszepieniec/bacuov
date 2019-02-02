@@ -232,12 +232,15 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
         Pi0VVN = bacuov_generate_linear_coefficients(QR, V, O, pk.seed_PCT, i)
         Pi = block_matrix([[Pi0V0V, Pi0VVN], [Pi0VVN.transpose(), MatrixSpace(QR, O, O).zero()]])
         PPc[i] = Pi
-        PP[i] = block_matrix([[matrixify(Pi[k,j]) for j in range(0, N)] for k in range(0, N)])
+        #PP[i] = block_matrix([[matrixify(Pi[k,j]) for j in range(0, N)] for k in range(0, N)])
+
+        # get FF[i][0:V, 0:V]
         FFc[i][0:V, 0:V] = PPc[i][0:V, 0:V]
         for j in range(0, V):
             for k in range(0, V):
                 FFc[i][j,k] = flip(QR.gen()*FFc[i][j,k])
 
+        # get FF[i][0:V, V:N] (and its counterpart)
         FFc[i][0:V, V:N] = PPc[i][0:V, 0:V] * S_top_right
         for j in range(0,V):
             for k in range(V,N):
@@ -251,6 +254,7 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
         FFc[i][0:V, V:N] = -FFc[i][0:V, V:N] + mat
         FFc[i][V:N, 0:V] = FFc[i][0:V, V:N].transpose()
 
+        # get PP[i][V:N, V:N]
         mat = FFc[i][0:N, 0:N]
         for j in range(0, N):
             for k in range(0, N):
@@ -309,6 +313,13 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
 
 
     ##print "suucceeeessss \\o/"
+
+    #print "FF[0][0:V, 0:V]:"
+    #bacuov_print_circulant_ring_matrix(FFc[0][0:V,0:V])
+    #print "FF[0][0:V, V:N]:"
+    #bacuov_print_circulant_ring_matrix(FFc[0][0:V,V:N])
+    #print "PP[0][V:N, V:N]:"
+    #bacuov_print_circulant_ring_matrix(PPc[0][V:N,V:N])
 
     # compress public polynomials -- take out every block's first row
     oiloil = []
