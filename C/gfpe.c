@@ -175,9 +175,9 @@ int gfpe_multiply( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
     gfpx rem, quo, defpoly;
     int i, j;
 
-    product.data = malloc(2*EXTENSION_DEGREE);
+    product = gfpx_init(2*EXTENSION_DEGREE);
 
-    for( i = 0 ; i < 2*EXTENSION_DEGREE ; ++i )
+    for( i = 0 ; i <= 2*EXTENSION_DEGREE ; ++i )
     {
         product.data[i] = 0;
     }
@@ -189,7 +189,6 @@ int gfpe_multiply( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
         }
     }
     product.degree = 2*EXTENSION_DEGREE;
-
 
     // reduce modulo DEFINING_POLYNOMIAL
     rem = gfpx_init(0);
@@ -227,7 +226,7 @@ int gfpe_inverse( gfpe_element * inv, gfpe_element elm )
     a = gfpx_init(0);
     b = gfpx_init(0);
     g = gfpx_init(0);
-    element = gfpx_init(EXTENSION_DEGREE);
+    element = gfpx_init(EXTENSION_DEGREE-1);
     defpoly = gfpe_init_defining_polynomial();
 
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
@@ -260,10 +259,11 @@ int gfpe_print( gfpe_element * elm )
 {
     int i;
     printf("(");
-    for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
+    for( i = 0 ; i < EXTENSION_DEGREE-1 ; ++i )
     {
-        printf("%i,", (int)elm->data[i]);
+        printf("%i*x^%i +", (int)elm->data[i], i);
     }
+    printf("%i*x^%i", (int)elm->data[EXTENSION_DEGREE-1], EXTENSION_DEGREE-1);
     printf(")");
     return 1;
 }

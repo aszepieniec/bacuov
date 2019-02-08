@@ -14,6 +14,7 @@ int gfpx_copy( gfpx* dest, gfpx source );
 int gfpx_destroy( gfpx p );
 
 int gfpx_add( gfpx* dest, gfpx lhs, gfpx rhs );
+int gfpx_subtract( gfpx* dest, gfpx lhs, gfpx rhs );
 int gfpx_multiply( gfpx* dest, gfpx lhs, gfpx rhs );
 int gfpx_multiply_constant_shift( gfpx* dest, gfpx poly, unsigned char constant, int shift );
 int gfpx_divide( gfpx* quo, gfpx* rem, gfpx num, gfpx den );

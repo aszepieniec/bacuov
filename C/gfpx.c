@@ -89,7 +89,7 @@ int gfpx_add( gfpx* dest, gfpx lhs, gfpx rhs )
 
     for( i = 0 ; i <= rhs.degree ; ++i )
     {
-        data[i] = lhs.data[i] ^ rhs.data[i];
+        data[i] = (lhs.data[i] + rhs.data[i]) % GF_PRIME_MODULUS;
     }
     for( ; i <= lhs.degree ; ++i )
     {
@@ -98,6 +98,52 @@ int gfpx_add( gfpx* dest, gfpx lhs, gfpx rhs )
 
     free(dest->data);
     dest->degree = lhs.degree;
+    dest->data = data;
+
+    while( data[dest->degree] == 0 && dest->degree > 0 )
+    {
+        dest->degree -= 1;
+    }
+
+    return 1;
+}
+
+/**
+ * gfpx_subtract
+ * Subtract the second GF(p)[x] element from the first.
+ */
+int gfpx_subtract( gfpx* dest, gfpx lhs, gfpx rhs )
+{
+    int i;
+    unsigned char * data;
+    int maxdeg;
+
+    maxdeg = lhs.degree;
+    if( rhs.degree > lhs.degree )
+    {
+        maxdeg = rhs.degree;
+    }
+
+    data = malloc(maxdeg+1);
+
+    for( i = 0 ; i <= maxdeg ; ++i )
+    {
+        if( i <= lhs.degree && i <= rhs.degree )
+        {
+            data[i] = (GF_PRIME_MODULUS + lhs.data[i] - rhs.data[i]) % GF_PRIME_MODULUS;
+        }
+        else if( i > lhs.degree )
+        {
+            data[i] = (GF_PRIME_MODULUS - rhs.data[i]) % GF_PRIME_MODULUS;
+        }
+        else if( i > rhs.degree )
+        {
+            data[i] = lhs.data[i];
+        }
+    }
+
+    free(dest->data);
+    dest->degree = maxdeg;
     dest->data = data;
 
     while( data[dest->degree] == 0 && dest->degree > 0 )
@@ -132,7 +178,7 @@ int gfpx_multiply( gfpx* dest, gfpx lhs, gfpx rhs )
         for( j = 0 ; j <= rhs.degree ; ++j )
         {
             gfp_multiply(&product, lhs.data[i], rhs.data[j]);
-            data[i+j] = data[i+j] ^ product;
+            data[i+j] = (data[i+j] + product) % GF_PRIME_MODULUS;
         }
     }
 
@@ -265,7 +311,7 @@ int gfpx_divide( gfpx* quo, gfpx* rem, gfpx num, gfpx divisor )
         return 1;
     }
 
-    /* make sure deg(divisor) > deg(numerator) */
+    /* make sure deg(divisor) <= deg(numerator) */
     if( divisor.degree > num.degree )
     {
         gfpx_zero(quo);
@@ -277,6 +323,11 @@ int gfpx_divide( gfpx* quo, gfpx* rem, gfpx num, gfpx divisor )
     remainder = gfpx_init(0);
     poly = gfpx_init(0);
     gfpx_copy(&remainder, num);
+    if( num.degree - divisor.degree + 1 == -1 )
+    {
+        printf("should never get here.\n");
+        getchar();
+    }
     quotient_data = malloc(num.degree - divisor.degree + 1);
     for( i = 0 ; i <= num.degree - divisor.degree ; ++i )
     {
@@ -298,7 +349,7 @@ int gfpx_divide( gfpx* quo, gfpx* rem, gfpx num, gfpx divisor )
 
 
         quotient_data[i] = compl;
-        gfpx_add(&remainder, remainder, poly);
+        gfpx_subtract(&remainder, remainder, poly);
 
     }
 
@@ -325,7 +376,7 @@ int gfpx_xgcd( gfpx* a, gfpx* b, gfpx* g, gfpx x, gfpx y )
     gfpx r, old_r;
     gfpx quotient, remainder;
     gfpx temp;
-    unsigned char lc;
+    gfp_element lc;
 
     s = gfpx_init(0);
     old_s = gfpx_init(0);
@@ -352,12 +403,12 @@ int gfpx_xgcd( gfpx* a, gfpx* b, gfpx* g, gfpx x, gfpx y )
         gfpx_copy(&r, remainder);
 
         gfpx_multiply(&temp, quotient, s);
-        gfpx_add(&temp, temp, old_s);
+        gfpx_subtract(&temp, temp, old_s);
         gfpx_copy(&old_s, s);
         gfpx_copy(&s, temp);
 
         gfpx_multiply(&temp, quotient, t);
-        gfpx_add(&temp, temp, old_t);
+        gfpx_subtract(&temp, temp, old_t);
         gfpx_copy(&old_t, t);
         gfpx_copy(&t, temp);
     }
@@ -381,8 +432,6 @@ int gfpx_xgcd( gfpx* a, gfpx* b, gfpx* g, gfpx x, gfpx y )
     return 1;
 }
 
-
-
 /**
  * gfpx_print
  * Cast the polynomial's coefficients to hex number and throw them to
@@ -392,10 +441,11 @@ int gfpx_print( gfpx p )
 {
     int i;
 
-    for( i = 0 ; i <= p.degree ; ++i )
+    for( i = 0 ; i < p.degree ; ++i )
     {
-        printf("%02x", p.data[i]);
+        printf("%i*x^%i + ", p.data[i], i);
     }
+    printf("%i*x^%i", p.data[p.degree], p.degree);
 
     return 1;
 }
