@@ -403,12 +403,12 @@ int gfpx_xgcd( gfpx* a, gfpx* b, gfpx* g, gfpx x, gfpx y )
         gfpx_copy(&r, remainder);
 
         gfpx_multiply(&temp, quotient, s);
-        gfpx_subtract(&temp, temp, old_s);
+        gfpx_subtract(&temp, old_s, temp);
         gfpx_copy(&old_s, s);
         gfpx_copy(&s, temp);
 
         gfpx_multiply(&temp, quotient, t);
-        gfpx_subtract(&temp, temp, old_t);
+        gfpx_subtract(&temp, old_t, temp);
         gfpx_copy(&old_t, t);
         gfpx_copy(&t, temp);
     }

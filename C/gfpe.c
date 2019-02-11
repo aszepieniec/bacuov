@@ -22,19 +22,11 @@ gfpx gfpe_init_defining_polynomial()
 gfpe_element gfpe( int castee )
 {
     gfpe_element e;
-    e = gfpe_init(sizeof(castee));
-    e.data[0] = gfp(((castee % GF_PRIME_MODULUS) + GF_PRIME_MODULUS) % GF_PRIME_MODULUS);
-    return e;
-}
-
-gfpe_element gfpe_init( unsigned int size )
-{
     int i;
-    gfpe_element e;
-
-    for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
+    e.data[0] = gfp(((castee % GF_PRIME_MODULUS) + GF_PRIME_MODULUS) % GF_PRIME_MODULUS);
+    for( i = 1 ; i < EXTENSION_DEGREE ; ++i )
     {
-        e.data[i] = gfp_init(0);
+        e.data[0] = 0;
     }
     return e;
 }
@@ -44,17 +36,12 @@ gfpe_element gfpe_clone( gfpe_element elm )
     return elm;
 }
 
-int gfpe_destroy( gfpe_element elm )
-{
-    return 1;
-}
-
-int gfpe_copy( gfpe_element * dest, gfpe_element * source )
+int gfpe_copy( gfpe_element * dest, gfpe_element source )
 {
     int i;
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        dest->data[i] = source->data[i];
+        dest->data[i] = source.data[i];
     }
     return 1;
 }
@@ -64,7 +51,7 @@ int gfpe_zero( gfpe_element* elm )
     int i;
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        gfp_zero( &(elm->data[i]) );
+        elm->data[i] = 0;
     }
     return 1;
 }
@@ -72,10 +59,10 @@ int gfpe_zero( gfpe_element* elm )
 int gfpe_one( gfpe_element* elm )
 {
     int i;
-    gfp_zero( &(elm->data[0]) );
+    elm->data[0] = 1;
     for( i = 1 ; i < EXTENSION_DEGREE ; ++i )
     {
-        gfp_zero( &(elm->data[i]) );
+        elm->data[i] = 0;
     }
     return 1;
 }
@@ -175,6 +162,12 @@ int gfpe_multiply( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
     gfpx rem, quo, defpoly;
     int i, j;
 
+    if( gfpe_is_zero(lhs) || gfpe_is_zero(rhs) )
+    {
+        gfpe_zero(res);
+        return 1;
+    }
+
     product = gfpx_init(2*EXTENSION_DEGREE);
 
     for( i = 0 ; i <= 2*EXTENSION_DEGREE ; ++i )
@@ -238,7 +231,7 @@ int gfpe_inverse( gfpe_element * inv, gfpe_element elm )
 
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        if( i < a.degree )
+        if( i <= a.degree )
         {
             inv->data[i] = a.data[i];
         }
@@ -255,16 +248,21 @@ int gfpe_inverse( gfpe_element * inv, gfpe_element elm )
     gfpx_destroy(defpoly);
 }
 
-int gfpe_print( gfpe_element * elm )
+int gfpe_print( gfpe_element elm )
 {
     int i;
-    printf("(");
-    for( i = 0 ; i < EXTENSION_DEGREE-1 ; ++i )
+    for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        printf("%i*x^%i +", (int)elm->data[i], i);
+        printf("%i", elm.data[i]);
+        //if( elm.data[i] != 0 )
+        //{
+        //    printf("%i*x^%i", elm.data[i], i);
+        //    if( i != EXTENSION_DEGREE - 1 && elm.data[i+1] != 0 )
+        //    {
+        //        printf(" + ");
+        //    }
+        //}
     }
-    printf("%i*x^%i", (int)elm->data[EXTENSION_DEGREE-1], EXTENSION_DEGREE-1);
-    printf(")");
     return 1;
 }
 

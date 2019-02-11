@@ -1,42 +1,20 @@
 #ifndef GFP
 #define GFP
 
-#ifndef BIG
-    
-    #ifndef GF_PRIME_MODULUS
-    #warning "Prime modulus undefined; setting to 31."
-    #define GF_PRIME_MODULUS 31
-    #endif
-    
-    #ifndef GFP_NUMBITS
-    #define GFP_NUMBITS 3
-    #endif
-    
-    #ifndef GFP_NUMBYTES
-    #define GFP_NUMBYTES ((GFP_NUMBITS+7)/8)
-    #endif
-    
-    #ifndef GFP_CONTAINER
-    #define GFP_CONTAINER
-    #if GFP_NUMBYTES == 1
-    typedef unsigned char gfp_element;
-    #elif GFP_NUMBYTES <= 4
-    typedef unsigned int gfp_element;
-    #else
-    typedef unsigned char[NUMBYTES] gfp_element;
-    #endif
-    #endif
-    
-#else
-    
-    #include "bi.h"
-    bi prime_modulus;
-    #define GF_PRIME_MODULUS prime_modulus
-    #define GFP_NUMBITS bi_bitsize(prime_modulus)
-    #define GFP_NUMBYTES ((GFP_NUMBITS+7)/8)
-    typedef bi gfp_element;
-
+#ifndef GF_PRIME_MODULUS
+#warning "Prime modulus undefined; setting to 31."
+#define GF_PRIME_MODULUS 31
 #endif
+
+#ifndef GFP_NUMBITES
+#define GFP_NUMBITS 8
+#endif
+
+#ifndef GFP_NUMBYTES
+#define GFP_NUMBYTES 1
+#endif
+
+typedef unsigned char gfp_element;
 
 gfp_element gfp( int castee );
 gfp_element gfp_init( unsigned int size );

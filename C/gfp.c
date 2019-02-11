@@ -77,7 +77,7 @@ int gfp_one( gfp_element* elm )
 int gfp_random( gfp_element* elm, unsigned char * randomness )
 {
     int i;
-    unsigned int r = 0;
+    unsigned long int r = 0;
     for( i = 0 ; i < GFP_NUMBYTES + 1 ; ++i )
     {
         r = r * 256 + randomness[i];
