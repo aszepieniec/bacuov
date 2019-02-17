@@ -141,7 +141,7 @@ int gfpe_subtract( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
     int i;
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        res->data[i] = (GF_PRIME_MODULUS + (int)(lhs.data[i]) - (int)(lhs.data[i])) % GF_PRIME_MODULUS;
+        res->data[i] = (GF_PRIME_MODULUS + (int)(lhs.data[i]) - (int)(rhs.data[i])) % GF_PRIME_MODULUS;
     }
     return 1;
 }

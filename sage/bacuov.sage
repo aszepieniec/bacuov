@@ -18,10 +18,18 @@ def hash_to_element( E, m ):
         return poly
 
 def hash_to_vector( E, d, m ):
+    r = E.modulus().degree()
+    F = E.modulus().parent().base_ring()
+    z = E.gen()
     VS = MatrixSpace(E, d, 1)
     vec = copy(VS.zero())
-    for i in range(0,d):
-        vec[i,0] = hash_to_element(E, m+"||"+str(i))
+    print "hashing:", binascii.hexlify(m)
+    digest = SHAKE256(m, d*r)
+    #digest = SHA3_256(m)
+    print "hash output:", binascii.hexlify(digest)
+    array = [F(digest[i]) for i in range(0, d*r)]
+    for i in range(0, d):
+        vec[i,0] = sum(array[i*r + j] * z^j for j in range(0, r))
     return vec
 
 def anticirculant_matrix( vector ):
@@ -126,26 +134,27 @@ def flip( qr_element ):
 
 def bacuov_generate_S( QR, V, O, seed ):
     l = QR.modulus().degree()
+    F = QR.modulus().parent().base_ring()
+    z = QR.gen()
     # append indicator
     for i in range(0, 4):
         seed += bytearray([int(0 >> (8*i))])
 
     # expand
     buff = SHAKE256(seed, l * V * O)
-    print "buffer:", binascii.hexlify(buff)
+    #print "buffer for S:", binascii.hexlify(buff)
 
     S = matrix([[QR.zero() for j in range(0,O)] for j in range(0,V)])
-    k = 0;
     for i in range(0, V):
         for j in range(0, O):
-            S[i,j] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
-            k = k + 1
+            S[i,j] = sum(z^k * F(buff[(i*O + j) * l + k]) for k in range(0, l))
 
     return S
 
 def bacuov_generate_vinegar_coefficients( QR, V, rand, index ):
-
     l = QR.modulus().degree()
+    F = QR.modulus().parent().base_ring()
+    z = QR.gen()
     # append indicator
     randomness = copy(rand)
     for i in range(0, 4):
@@ -158,20 +167,21 @@ def bacuov_generate_vinegar_coefficients( QR, V, rand, index ):
     #print "buffer:", binascii.hexlify(buff), "<-- got it!"
 
     Pi = matrix([[QR.zero() for i in range(0,V)] for j in range(0,V)])
-    k = 0;
+    K = 0;
     for i in range(0, V):
-        Pi[i,i] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
-        k = k + 1
+        Pi[i,i] = sum(F(buff[K + k]) * z^k for k in range(0, l))
+        K += l
         for j in range(i+1, V):
-            Pi[i,j] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
+            Pi[i,j] = sum(F(buff[K + k]) * z^k for k in range(0, l))
             Pi[j,i] = Pi[i,j]
-            k = k + 1
+            K += l
 
     return Pi
    
 def bacuov_generate_linear_coefficients( QR, V, O, rand, index ): 
-
     l = QR.modulus().degree()
+    F = QR.modulus().parent().base_ring()
+    z = QR.gen()
     # append indicator
     randomness = copy(rand)
     for i in range(0, 4):
@@ -181,14 +191,12 @@ def bacuov_generate_linear_coefficients( QR, V, O, rand, index ):
 
     # expand
     buff = SHAKE256(randomness, l * V * O)
-    print "buffer:", binascii.hexlify(buff)
+    #print "buffer:", binascii.hexlify(buff)
 
     Pi = matrix([[QR.zero() for j in range(0,O)] for i in range(0,V)])
-    k = 0;
     for i in range(0, V):
         for j in range(0, O):
-            Pi[i,j] = bacuov_sample_circulant_ring_element(QR, buff[(l*k):(l*(k+1))])
-            k = k + 1
+            Pi[i,j] = sum(F(buff[(i*O+j)*l + k]) * z^k for k in range(0, l))
 
     return Pi
 
@@ -198,6 +206,7 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     N = O + V
     n = o + v
     m = o
+    print "got m:", m
 
     Fx = PolynomialRing(F, "x")
     modulus = x^l - 1
@@ -205,10 +214,12 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
 
     pk = bacuov_public_key(F, V, O, l)
 
-    print "inside keygen with randomness", binascii.hexlify(randomness)
+    #print "inside keygen with randomness", binascii.hexlify(randomness)
 
     # expand randomness into seeds
+    print "SHAKE input:", binascii.hexlify(randomness)
     output = SHAKE256(randomness, 2*SECURITY_LEVEL/4)
+    print "SHAKE output:", binascii.hexlify(output)
 
     # grab seed for S and for PCT
     seed_S = output[0:(SECURITY_LEVEL/4)]
@@ -219,6 +230,9 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     # sample secret linear transform S
     VS = MatrixSpace(F, l, 1)
     S_top_right = bacuov_generate_S(QR, V, O, seed_S)
+    #print "S:"
+    #bacuov_print_circulant_ring_matrix(S_top_right)
+    #input(1)
     S = block_matrix([[MatrixSpace(F, V, V).identity_matrix(), S_top_right], [MatrixSpace(F, O, V).zero(), MatrixSpace(F, O, O).identity_matrix()]])
     S = block_matrix([[matrixify(S[i,j]) for j in range(0, N)] for i in range(0, N)])
 
@@ -233,6 +247,10 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
         Pi = block_matrix([[Pi0V0V, Pi0VVN], [Pi0VVN.transpose(), MatrixSpace(QR, O, O).zero()]])
         PPc[i] = Pi
         #PP[i] = block_matrix([[matrixify(Pi[k,j]) for j in range(0, N)] for k in range(0, N)])
+
+        #print "Pi0VVN:"
+        #bacuov_print_circulant_ring_matrix(Pi0VVN)
+        #input(1)
 
         # get FF[i][0:V, 0:V]
         FFc[i][0:V, 0:V] = PPc[i][0:V, 0:V]
@@ -253,6 +271,10 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
 
         FFc[i][0:V, V:N] = -FFc[i][0:V, V:N] + mat
         FFc[i][V:N, 0:V] = FFc[i][0:V, V:N].transpose()
+
+        #print "FFov:"
+        #bacuov_print_circulant_ring_matrix(FFc[i][0:V, V:N])
+        #input(1)
 
         # get PP[i][V:N, V:N]
         mat = FFc[i][0:N, 0:N]
@@ -329,35 +351,105 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
                 for j in range(i, N):
                     oiloil.append(PPc[k][i,j])
 
-    return (FFc, S_top_right), (seed, oiloil, l, m, n)
+    return (randomness, FFc, S_top_right), (seed, oiloil, l, m, n)
 
-def sign( E, sk, doc ):
-    FF, S = sk
-    n = S.nrows()
+def bacuov_str_gfpem( mat ):
+    E = mat[0,0].parent()
+    r = E.modulus().degree()
+    F = E.modulus().parent().base_ring()
+    string = "["
+    for i in range(0, mat.nrows()):
+        strings = []
+        for j in range(0, mat.ncols()):
+            coeffs = mat[i,j].polynomial().coefficients(sparse=False)
+            while len(coeffs) != r:
+                coeffs.append(F(0))
+            strings.append("".join(str(coeffs[k]) for k in range(0, r)))
+        string += "["
+        string += ", ".join(strings)
+        string += "]"
+        if i != mat.nrows()-1:
+            string += "\n"
+    string += "]"
+    return string
+
+def gfpe_to_str( elm ):
+    E = elm.parent()
+    r = E.modulus().degree()
+    F = E.modulus().parent().base_ring()
+    coeffs = elm.polynomial().coefficients(sparse=False)
+    while len(coeffs) != r:
+        coeffs.append(F(0))
+    return "".join(str(c) for c in coeffs)
+
+def bacuov_sign( SECURITY_LEVEL, E, sk, doc ):
+    randomness, FF, S_top_right = sk
+    V = S_top_right.nrows()
+    l = S_top_right[0,0].parent().modulus().degree()
+    v = V*l
     m = len(FF)
     o = m
-    v = n-o
+    O = o/l
+    n = v+o
+    r = E.modulus().degree()
+    z = E.gen()
 
     # get hash
     target = hash_to_vector(E, m, doc)
 
-    # find vinegar variables that leads to invertible coefficient matrix
+    # find vinegar variables that lead to invertible coefficient matrix
     is_invertible = False
-    while not is_invertible:
-    	xv = MatrixSpace(E, v, 1).random_element()
+    for trial_index in range(0, 256):
+        array = SHAKE256(doc, m*r)
+        array += randomness
+        array.append(trial_index)
+        vinegar_array = SHAKE256(array, v*r)
+    	xv = MatrixSpace(E, v, 1).random_element() # no.
+        for i in range(0, v):
+            xv[i,0] = sum(E(vinegar_array[i*r + j]) * z^j for j in range(0, r))
+        #print "vinegar vector:"
+        #print bacuov_str_gfpem(xv)
+        
     	coefficient_matrix = copy(MatrixSpace(E, o, o).zero())
     	for i in range(0, o):
-    	    coefficient_matrix[i,:] = xv.transpose() * (FF[i][0:v,v:(v+o)] + FF[i][v:(v+o),0:v].transpose())
+            FFi = block_matrix([[matrixify(FF[i][j,k]) for k in range(0, FF[i].ncols())] for j in range(0, FF[i].nrows())])
+            #if i >= 1:
+            #    print "FFvoi:"
+            #    #print FF[i][0:V, V:(V+O)]
+            #    print bacuov_str_gfpem(FFi[0:v, v:(v+o)])
+            #    print "xv: "
+            #    print bacuov_str_gfpem(xv.transpose())
+            #    input(1)
+    	    coefficient_matrix[i,:] = xv.transpose() * (FFi[0:v,v:(v+o)] + FFi[v:(v+o),0:v].transpose())
+
+            #if i >= 1:
+            #    print "line of coefficient matrix:"
+            #    #print bacuov_str_gfpem(coefficient_matrix[i,:])
+            #    print bacuov_str_gfpem(xv.transpose() * FFi[0:v, v:(v+o)])
+            #    input(1)
+
         if coefficient_matrix.determinant() != 0:
-            is_invertible = True
+            break
 
     # solve linear system to obtain matching oil variables
-    target -= matrix([[(xv.transpose() * FF[i][0:v, 0:v] * xv)[0,0]] for i in range(0, m)])
-    xo = coefficient_matrix.inverse() * target
+    b = target
+    for i in range(0, m):
+        FFi = block_matrix([[matrixify(FF[i][j,k]) for k in range(0, FF[i].ncols())] for j in range(0, FF[i].nrows())])
+        b[i,0] = b[i,0] - (xv.transpose() * FFi[0:v, 0:v] * xv)[0,0]
+
+    xo = coefficient_matrix.inverse() * b
     x = block_matrix([[xv], [xo]])
 
     # invert secret linear transform
-    s = MatrixSpace(E, S.nrows(), S.ncols())(S.inverse()) * x
+    #s = MatrixSpace(E, S.nrows(), S.ncols())(S.inverse()) * x
+    #S_ = block_matrix([[matrixify(S_top_right[i,j]) for j in range(0, S_top_right.ncols())] for i in range(0, S_top_right.nrows())])
+    #S_xo = S_ * xo
+    #s = x
+    #s[0:v,0] = s[0:v,0] - S_xo
+    S_full = block_matrix([[MatrixSpace(E, V, V).identity_matrix(), S_top_right], [MatrixSpace(E, O, V).zero(), MatrixSpace(E, O, O).identity_matrix()]])
+    S_ = block_matrix([[matrixify(S_full[i,j]) for j in range(0, S_full.ncols())] for i in range(0, S_full.nrows())])
+    Sinv = S_.inverse()
+    s = Sinv * x
 
     return s
 

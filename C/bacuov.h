@@ -31,11 +31,13 @@
 #endif
 
 #include "gfp.h"
+#include "gfpe.h"
 #include "gfpcirc.h"
 #include "gfpcircm.h"
 
 typedef struct
 {
+    unsigned char seed[SECURITY_LEVEL/4];
     gfpcircmatrix FFvv[BACUOV_PARAM_M];
     gfpcircmatrix FFvo[BACUOV_PARAM_M];
     gfpcircmatrix S;
@@ -49,7 +51,7 @@ typedef struct
 
 typedef struct
 {
-    gfpcirc_element vector[(BACUOV_PARAM_O+BACUOV_PARAM_V)];
+    gfpe_element vector[(BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY];
 } bacuov_signature;
 
 

@@ -57,7 +57,7 @@ int gfpcirc_zero( gfpcirc_element* elm )
 int gfpcirc_one( gfpcirc_element* elm )
 {
     int i;
-    gfp_zero( &(elm->data[0]) );
+    gfp_one( &(elm->data[0]) );
     for( i = 1 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
         gfp_zero( &(elm->data[i]) );
@@ -139,7 +139,7 @@ int gfpcirc_subtract( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_elemen
     int i;
     for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
-        res->data[i] = (GF_PRIME_MODULUS + (int)(lhs.data[i]) - (int)(lhs.data[i])) % GF_PRIME_MODULUS;
+        res->data[i] = (GF_PRIME_MODULUS + (int)(lhs.data[i]) - (int)(rhs.data[i])) % GF_PRIME_MODULUS;
     }
     return 1;
 }

@@ -920,7 +920,7 @@ int gfpem_stack( gfpematrix mat, gfpematrix top, gfpematrix bottom )
     {
         for( j = 0 ; j < top.width ; ++j )
         {
-            gfpe_copy(&mat.data[i*top.width + j], top.data[i*top.width + j]);
+            gfpe_copy(&mat.data[i*mat.width + j], top.data[i*top.width + j]);
         }
     }
     for( i = 0 ; i < bottom.height ; ++i )
