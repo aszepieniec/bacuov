@@ -285,15 +285,15 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
 
         // copy FF[i][0:V,0:V]
         gfpcircm_copy(sk->FFvv[i], Pi0V0V);
-        gfpcircm_shiftflip(sk->FFvv[i],1);
+        //gfpcircm_shiftflip(sk->FFvv[i],1);
 
         // compute FF[i][0:V,V:N]
         gfpcircm_multiply(&sk->FFvo[i], Pi0V0V, sk->S);
-        gfpcircm_shiftflip(sk->FFvo[i],2);
+        //gfpcircm_shiftflip(sk->FFvo[i],2);
         gfpcircm_negate(sk->FFvo[i]);
 
         gfpcircm_copy(matVO, Pi0VVN);
-        gfpcircm_shiftflip(matVO, 1);
+        //gfpcircm_shiftflip(matVO, 1);
         gfpcircm_add(sk->FFvo[i], sk->FFvo[i], matVO);
 
 		//printf("FFov:\n");
@@ -303,12 +303,12 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         // compute PP[i][V:N,V:N]
         gfpcircm_transpose(&sk->S);
         gfpcircm_copy(tempVO, sk->FFvo[i]);
-        gfpcircm_flip(tempVO);
+        //gfpcircm_flip(tempVO);
         gfpcircm_multiply(&matOO, sk->S, tempVO);
         gfpcircm_transpose(&matOO);
 
         gfpcircm_copy(tempVV, sk->FFvv[i]);
-        gfpcircm_flipshift(tempVV, 1);
+        //gfpcircm_flipshift(tempVV, 1);
         gfpcircm_multiply(&tempOV, sk->S, tempVV);
         gfpcircm_transpose(&sk->S);
         gfpcircm_multiply(&pk->PPoo[i], tempOV, sk->S);
@@ -442,10 +442,12 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
 	gfpematrix coeff_line;
 	gfpematrix FFvoi;
 	gfpmatrix FFvoi_temp, FFvvi;
-    gfpmatrix S_;
+    gfpmatrix S_, S__;
     gfpematrix xv_FFvvi;
     gfpcircmatrix S;
     gfpematrix x, s;
+    gfpe_element signature[(BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY];
+    gfpematrix update;
 
     // init matrices
     target = gfpem_init(BACUOV_PARAM_M, 1);
@@ -459,9 +461,11 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
     FFvvi = gfpm_init(BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY, BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY);
     xv_FFvvi = gfpem_init(1, BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY);
     S_ = gfpm_init((BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY, (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY);
+    S__ = gfpm_init((BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY, (BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY);
     S = gfpcircm_init(BACUOV_PARAM_O+BACUOV_PARAM_V, BACUOV_PARAM_O+BACUOV_PARAM_V);
     x = gfpem_init((BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY, 1);
     s = gfpem_init((BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY, 1);
+    update = gfpem_init(BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY, 1);
 
     // hash to vector
     FIPS202_SHAKE256(msg, msg_len, array, BACUOV_PARAM_M * EXTENSION_DEGREE);
@@ -492,31 +496,12 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
 				xv.data[i].data[j] = vinegar_array[i*EXTENSION_DEGREE + j] % GF_PRIME_MODULUS;
 			}
 		}
-		//printf("vinegar variables:\n");
-		//gfpem_print(xv);
 
 		// compile coefficient matrix line by line
 		for( i = 0 ; i < BACUOV_PARAM_M ; ++i )
 		{
 			gfpcircm_press(&FFvoi_temp, sk.FFvo[i]);
 			gfpem_multiply_base(&coeff_line, xv, FFvoi_temp);
-
-			//if( i >= 1 )
-			//{
-			//printf("FFvoi:\n");
-			//gfpm_print(FFvoi_temp);
-			//printf("xv:\n");
-			//gfpem_print(xv);
-			////gfpcircm_print(sk.FFvo[i]);
-			//getchar();
-			//}
-	
-			//if( i >= 1 )
-			//{
-			//printf("line of coefficient matrix:\n");
-			//gfpem_print(coeff_line);
-			//getchar();
-			//}
 
 			// copy line (and multiply by two, while you're at it)
 			for( j = 0 ; j < BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY ; ++j )
@@ -527,10 +512,7 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
 				}
 			}
 		}
-
-		//printf("coefficient matrix:\n");
-		//gfpem_print(coeff);
-		
+	
 		if( gfpem_inverse(inverse, coeff) == 1 )
 			break;
 	}
@@ -587,6 +569,60 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
         gfpe_copy(&sig->vector[i], s.data[i]);
     }
 
+    // copy vinegars
+    for( i = 0 ; i < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        j = i % DEGREE_OF_CIRCULANCY;
+        k = i - j;
+        if( j == 0 )
+        {
+            signature[i] = xv.data[i];
+        }
+        else
+        {
+            signature[k + DEGREE_OF_CIRCULANCY-1 - (j-1)] = xv.data[i];
+        }
+    }
+    // update vinegars
+    gfpcircm_press(&S__, sk.S);
+    gfpem_base_multiply(&update, S__, xo);
+    printf("update:\n");
+    gfpem_print(update);
+    getchar();
+    printf("xv:\n");
+    gfpem_print(xv);
+    getchar();
+    for( i = 0 ; i < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        gfpe_print(signature[i]); printf(" - "); gfpe_print(update.data[i]); printf(" = ");
+        gfpe_subtract(&signature[i], signature[i], update.data[i]);
+        gfpe_print(signature[i]); printf("\n");
+    }
+    getchar();
+    // copy oils
+    for( i = 0 ; i < BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        j = i % DEGREE_OF_CIRCULANCY;
+        k = i - j;
+        if( j == 0 )
+        {
+            signature[BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY + i] = xo.data[i];
+        }
+        else
+        {
+            signature[BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY + k + DEGREE_OF_CIRCULANCY-1 - (j-1)] = xo.data[i];
+            //signature[BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY + k + j] = xo.data[i];
+        }
+    }
+    printf("signatures:\n");
+    for( i = 0 ; i < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++i )
+    {
+        gfpe_print(signature[i]);
+        printf(" ");
+        gfpe_print(sig->vector[i]);
+        printf("\n");
+    }
+
     // destroy matrices
     gfpem_destroy(target);
 	gfpem_destroy(coeff);
@@ -599,8 +635,10 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
 	gfpm_destroy(FFvvi);
     gfpcircm_destroy(S);
 	gfpm_destroy(S_);
+	gfpm_destroy(S__);
 	gfpem_destroy(xv_FFvvi);
     gfpem_destroy(x);
     gfpem_destroy(s);
+    gfpem_destroy(update);
 }
 

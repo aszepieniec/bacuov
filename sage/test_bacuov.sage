@@ -1,5 +1,5 @@
 import sys
-load("bacuov.sage")
+load("bacuov2.sage")
 from CompactFIPS202 import SHAKE256
 import binascii
 
@@ -33,10 +33,12 @@ def test( num_trials, seed ):
         sk, pk = bacuov_keygen(SECURITY_LEVEL, F, V, O, l, key_seed)
         sig = bacuov_sign(SECURITY_LEVEL, E, sk, document)
 
+        if bacuov_verify(pk, document, sig) == True:
+            num_successes += 1
+
     print "Ran", num_trials, "trials with", num_successes, "successes and", (num_integrity_failures + num_decoding_failures), "failures."
     print "Failures:"
-    print " *", num_decoding_failures, "decoding errors"
-    print " *", num_integrity_failures, "integrity errors"
+    print " *", (num_trials-num_successes)
     print "Successes:"
     print " *", num_successes, "total successes"
 

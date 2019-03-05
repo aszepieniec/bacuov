@@ -246,6 +246,14 @@ def bacuov_generate_linear_coefficients( QR, V, O, rand, index ):
 
     return Pi
 
+def bacuov_circulant_smart_reverse( elm ):
+    QR = elm.parent()
+    coeffs = elm.lift().coefficients(sparse=False)
+    while len(coeffs) != QR.modulus().degree():
+        coeffs.append(elm.parent().zero())
+    coeffs = [coeffs[0]] + [coeffs[len(coeffs)-1-i] for i in range(0, len(coeffs)-1)]
+    return sum(QR.gen()^i * coeffs[i] for i in range(0, len(coeffs)))
+
 def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     o = O * l
     v = V * l
@@ -284,6 +292,7 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
     PP = [copy(MatrixSpace(F, n, n).zero()) for k in range(0,m)]
     PPc = [copy(MatrixSpace(QR, N, N).zero()) for k in range(0,m)]
     FFc = [copy(MatrixSpace(QR, N, N).zero()) for k in range(0,m)]
+    #S_top_right = matrix([[bacuov_circulant_smart_reverse(S_top_right[i,j]) for j in range(0, S_top_right.ncols())] for i in range(0, S_top_right.nrows())])
     # loop over all m polynomials
     for i in range(0,m):
         # generate top left and top right blocks of Pi
@@ -301,11 +310,7 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
         FFc[i][0:V, 0:V] = PPc[i][0:V, 0:V]
 
         # get FF[i][0:V, V:N] (and its counterpart)
-        FFc[i][0:V, V:N] = PPc[i][0:V, 0:V] * S_top_right
-
-        mat = PPc[i][0:V, V:N] * QR.gen()
-
-        FFc[i][0:V, V:N] = -FFc[i][0:V, V:N] + mat
+        FFc[i][0:V, V:N] = PPc[i][0:V, V:N] - PPc[i][0:V, 0:V] * S_top_right
         FFc[i][V:N, 0:V] = FFc[i][0:V, V:N].transpose()
 
         #print "FFov:"
@@ -313,12 +318,42 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
         #input(1)
 
         # get PP[i][V:N, V:N]
-        mat = FFc[i][0:N, 0:N]
+        temp = FFc[i][V:N, 0:V] * S_top_right
+        PPc[i][V:N, V:N] = S_top_right.transpose() * FFc[i][0:V, 0:V] * S_top_right + temp.transpose() + temp
 
-        temp = mat[V:N, 0:V] * S_top_right
+        #if i == 0:
+            #print "PPc[0:V, 0:V]:"
+            #print block_matrix([[matrixify_anticirculant(PPc[i][j,k]) for k in range(0,V)] for j in range(0,V)])
+            #Pe = block_matrix([[matrixify_anticirculant(PPc[i][j,k]) for k in range(0,PPc[i].ncols())] for j in range(0,PPc[i].nrows())])
+            #print "PPe[0:v, 0:v]:"
+            #print Pe[0:v, 0:v]
 
-        #PPc[i][V:N, V:N] = S_top_right.transpose() * mat[0:V, 0:V] * S_top_right + mat[V:N, 0:V] * S_top_right + S_top_right.transpose() * mat[0:V, V:N]
-        PPc[i][V:N, V:N] = S_top_right.transpose() * mat[0:V, 0:V] * S_top_right + temp.transpose() + temp
+            #print "PPc[0:v, 0:v] * reversed_S_tr:"
+            #print block_matrix([[matrixify_anticirculant((PPc[i][0:V, V:N] + PPc[i][0:V, 0:V] * S_top_right)[j,k]) for k in range(0, O)] for j in range(0, V)])
+            #print "PPe[0:v, 0:v] * S_tr:"
+            #print block_matrix([[matrixify_anticirculant(PPc[i][j, k]) for k in range(0, V)] for j in range(0, V)]) * block_matrix([[matrixify_circulant(S_top_right[j,k]) for k in range(0, O)] for j in range(0, V)])
+
+            #print "PPc[0:v, 0:v] * S_tr:"
+            #print block_matrix([[matrixify_anticirculant((PPc[i][0:V, 0:V] * S_top_right)[j,k]) for k in range(0, O)] for j in range(0, V)])
+            #print "PPe[0:v, 0:v] * S_tr:"
+            #print Pe[0:v, v:n] + Pe[0:v,0:v] * S[0:v, v:n]
+
+            #print "FFc:"
+            #print block_matrix([[matrixify_anticirculant(FFc[i][j,k]) for k in range(0, FFc[i].ncols())] for j in range(0, FFc[i].nrows())])
+            #print "FFe:"
+            #Fe = matrix([[F.zero() for k in range(0,n)] for j in range(0,n)])
+            #Fe[0:v, 0:v] = block_matrix([[matrixify_anticirculant(PPc[i][j,k]) for k in range(0,V)] for j in range(0,V)])
+            #Fe[0:v, v:n] = block_matrix([[matrixify_anticirculant(PPc[i][j,V+k]) for k in range(0,O)] for j in range(0,V)]) + block_matrix([[matrixify_anticirculant(PPc[i][j,k]) for k in range(0,V)] for j in range(0,V)]) * block_matrix([[matrixify_circulant(S_top_right[j,k]) for k in range(0,O)] for j in range(0,V)])
+            #Fe[v:n, 0:v] = Fe[0:v, v:n].transpose()
+            #print Fe
+
+            #print "P[0]:"
+            #print Pe
+            #Fe = block_matrix([[matrixify_anticirculant(FFc[i][j,k]) for k in range(0,FFc[i].ncols())] for j in range(0,FFc[i].nrows())])
+            #Fe = block_matrix([[matrixify_anticirculant(FFc[i][j,k]) for k in range(0, FFc[i].ncols())] for j in range(0, FFc[i].nrows())])
+            #print "S^T F[0] S:"
+            #print S.transpose() * Fe * S
+            #input(1)
     
     pk.PP = [PPc[i][V:N, V:N] for i in range(0,m)]
    
@@ -360,7 +395,8 @@ def gfpe_to_str( elm ):
 
 def bacuov_sign( SECURITY_LEVEL, E, sk, doc ):
     FF = sk.FF
-    S_top_right = sk.S_top_right
+    S_top_right = matrix([[bacuov_circulant_smart_reverse(sk.S_top_right[i,j]) for j in range(0, sk.S_top_right.ncols())] for i in range(0, sk.S_top_right.nrows())])
+
     randomness = sk.randomness
     V = sk.V
     l = sk.l
@@ -432,8 +468,8 @@ def bacuov_sign( SECURITY_LEVEL, E, sk, doc ):
     #s[0:v,0] = s[0:v,0] - S_xo
     QR = S_top_right[0,0].parent()
     S_full = block_matrix([[MatrixSpace(QR, V, V).identity_matrix(), -S_top_right], [MatrixSpace(QR, O, V).zero(), MatrixSpace(QR, O, O).identity_matrix()]])
-    S_ = block_matrix([[matrixify_circulant(S_full[i,j]) for j in range(0, S_full.ncols())] for i in range(0, S_full.nrows())])
-    Sinv = S_#.inverse()
+                                                                   # ^ inverse
+    Sinv = block_matrix([[matrixify_circulant(S_full[i,j]) for j in range(0, S_full.ncols())] for i in range(0, S_full.nrows())])
     s = Sinv * x
 
     return s
@@ -465,6 +501,8 @@ def bacuov_verify( pk, doc, sig ):
 
     # compare evaluation to hash
     if target == evaluation:
+        print "evaluation:", bacuov_str_gfpem(evaluation.transpose())
+        print "target  :  ", bacuov_str_gfpem(target.transpose())
         return True
 
     else:
