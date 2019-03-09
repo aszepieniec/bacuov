@@ -160,10 +160,10 @@ void bacuov_generate_linear_coefficients( gfpcircmatrix * Pi0VVN, unsigned char 
     {
         for( j = 0 ; j < BACUOV_PARAM_O ; ++j )
         {
-			for( k = 0 ; k < DEGREE_OF_CIRCULANCY ; ++k )
-			{
+            for( k = 0 ; k < DEGREE_OF_CIRCULANCY ; ++k )
+            {
             	Pi0VVN->data[i*BACUOV_PARAM_O+j].data[k] = buffer[(i*BACUOV_PARAM_O+j)*DEGREE_OF_CIRCULANCY + k] % GF_PRIME_MODULUS;
-			}
+            }
         }
     }
 }
@@ -322,8 +322,10 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     /*
     printf("FF[0][0:V, 0:V]:\n");
     gfpcircm_print(sk->FFvv[0]);
+	*/
     printf("FF[0][0:V, V:N]:\n");
     gfpcircm_print(sk->FFvo[0]);
+    /*
     printf("PP[0][V:N, V:N]:\n");
     gfpcircm_print(pk->PPoo[0]);
     */
@@ -433,6 +435,7 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
 	unsigned char vinegar_array[BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY * EXTENSION_DEGREE];
 	unsigned int trial_index;
     int i, j, k;
+	gfpcirc_element elm;
 	gfpe_element element;
     gfpe_element inner_product, temp;
     gfpematrix target;
@@ -488,7 +491,15 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
 	{
 		// use SHAKE to extract randomness from which to sample vinegar variables
 		array[BACUOV_PARAM_M * EXTENSION_DEGREE + SECURITY_LEVEL/4] = trial_index & 0xff;
+		printf("SHAKE input: ");
+		for( i = 0 ; i < sizeof(array) ; ++i )
+			printf("%02x", array[i]);
+		printf("\n");
 		FIPS202_SHAKE256(array, sizeof(array), vinegar_array, sizeof(vinegar_array));
+		printf("vinegar array: ");
+		for( i = 0 ; i < sizeof(vinegar_array) ; ++i )
+			printf("%02x", vinegar_array[i]);
+		printf("\n");
 		for( i = 0 ; i < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++i )
 		{
 			for( j = 0 ; j < EXTENSION_DEGREE ; ++j )
@@ -550,7 +561,10 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
     {
         for( j = BACUOV_PARAM_V ; j < BACUOV_PARAM_V + BACUOV_PARAM_O ; ++j )
         {
-            gfpcirc_subtract(&S.data[i,j], S.data[i,j], sk.S.data[i, j-BACUOV_PARAM_V]);
+			gfpcirc_copy(&elm, &sk.S.data[i, j-BACUOV_PARAM_V]);
+			gfpcirc_flr(&elm);
+			//gfpcirc_subtract(&S.data[i,j], S.data[i,j], sk.S.data[i, j-BACUOV_PARAM_V]);
+            gfpcirc_subtract(&S.data[i,j], S.data[i,j], elm);
         }
     }
     gfpcircm_press(&S_, S);
@@ -562,6 +576,9 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
     {
         gfpe_copy(&x.data[BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY+i], xo.data[i]);
     }
+
+	printf("x:\n");
+	gfpem_print(x);
 
     gfpem_base_multiply(&s, S_, x);
     for( i = 0 ; i < (BACUOV_PARAM_O + BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++i )
@@ -586,12 +603,10 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
     // update vinegars
     gfpcircm_press(&S__, sk.S);
     gfpem_base_multiply(&update, S__, xo);
-    printf("update:\n");
-    gfpem_print(update);
-    getchar();
-    printf("xv:\n");
-    gfpem_print(xv);
-    getchar();
+    //printf("xv:\n");
+    //gfpem_print(xv);
+    //getchar();
+	//
     for( i = 0 ; i < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++i )
     {
         gfpe_print(signature[i]); printf(" - "); gfpe_print(update.data[i]); printf(" = ");

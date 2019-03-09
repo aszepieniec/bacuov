@@ -25,7 +25,6 @@ def hash_to_vector( E, d, m ):
     vec = copy(VS.zero())
     print "hashing:", binascii.hexlify(m)
     digest = SHAKE256(m, d*r)
-    #digest = SHA3_256(m)
     print "hash output:", binascii.hexlify(digest)
     array = [F(digest[i]) for i in range(0, d*r)]
     for i in range(0, d):
@@ -356,6 +355,9 @@ def bacuov_keygen( SECURITY_LEVEL, F, V, O, l, randomness ):
             #input(1)
     
     pk.PP = [PPc[i][V:N, V:N] for i in range(0,m)]
+
+    #print "FF[0][0:V,V:N]:"
+    #bacuov_print_circulant_ring_matrix(FFc[0][0:V,V:N])
    
     sk = bacuov_secret_key(F, V, O, l) 
     sk.FF = [FFc[i] for i in range(0,m)]
@@ -409,13 +411,14 @@ def bacuov_sign( SECURITY_LEVEL, E, sk, doc ):
     z = E.gen()
 
     # get hash
-    target = hash_to_vector(E, m, doc)
+    #target = hash_to_vector(E, m, doc)
+    array = SHAKE256(doc, m*r)
 
     # get randomness
     # if a true random source is available, that is preferable
     # otherwise, use the secret key randomness and the
     # document-to-be-signed, like so:
-    array = SHAKE256(randomness + doc, SECURITY_LEVEL/4)
+    array = SHAKE256(randomness + SHA3_256(doc), SECURITY_LEVEL/4)
     array.append(0)
 
     # find vinegar variables that lead to invertible coefficient matrix
@@ -423,8 +426,9 @@ def bacuov_sign( SECURITY_LEVEL, E, sk, doc ):
     for trial_index in range(0, 256):
         array = array[0:-1]
         array.append(trial_index)
-        vinegar_array = SHAKE256(array, v*r)
-    	xv = MatrixSpace(E, v, 1).random_element() # no.
+        vinegar_array = SHAKE256(array + sk.randomness + chr(trial_index), v*r)
+        print "vinegar array:", binascii.hexlify(vinegar_array)
+    	xv = copy(MatrixSpace(E, v, 1).zero())
         for i in range(0, v):
             xv[i,0] = sum(E(vinegar_array[i*r + j]) * z^j for j in range(0, r))
         #print "vinegar vector:"
@@ -459,6 +463,9 @@ def bacuov_sign( SECURITY_LEVEL, E, sk, doc ):
 
     xo = coefficient_matrix.inverse() * b
     x = block_matrix([[xv], [xo]])
+    
+    print "x:"
+    print bacuov_str_gfpem(x)
 
     # invert secret linear transform
     #s = MatrixSpace(E, S.nrows(), S.ncols())(S.inverse()) * x

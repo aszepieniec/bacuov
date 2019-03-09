@@ -34,6 +34,7 @@ int gfpcirc_shift( gfpcirc_element * elm, int shamt );
 int gfpcirc_print( gfpcirc_element * elm );
 int gfpcirc_is_one( gfpcirc_element elm );
 int gfpcirc_is_zero( gfpcirc_element elm );
+int gfpcirc_flr( gfpcirc_element * elm );
 
 #endif
 
