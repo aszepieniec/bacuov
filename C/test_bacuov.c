@@ -67,12 +67,14 @@ int main( int argc, char ** argv )
 
         bacuov_sign(&sig, sk, document, sizeof(document));
 
+        num_successes = num_successes + bacuov_verify(pk, document, sizeof(document), &sig);
+
         bacuov_secret_key_destroy(sk);
         bacuov_public_key_destroy(pk);
     }
 
     /* report on results */
-    num_successes = 0;
+    num_failures = num_trials - num_successes;
     printf("Ran %i trials with %i successes and %i failures.\n", num_trials, num_successes, num_failures);
     printf("Successes:\n");
     printf(" * %i total successes\n", num_successes);

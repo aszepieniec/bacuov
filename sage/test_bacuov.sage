@@ -1,5 +1,5 @@
 import sys
-load("bacuov2.sage")
+load("bacuov.sage")
 from CompactFIPS202 import SHAKE256
 import binascii
 
@@ -23,10 +23,8 @@ def test( num_trials, seed ):
     E = FiniteField(7^5, "x", modulus=poly)
 
     num_successes = 0
-    num_integrity_failures = 0
-    num_decoding_failures = 0
     for trial_index in range(0, num_trials):
-        randomness = SHAKE256(randomness, 2*SECURITY_LEVEL/4)
+        randomness = SHAKE256(randomness[0:(SECURITY_LEVEL/4)], 2*SECURITY_LEVEL/4)
         print "random buffer:", binascii.hexlify(randomness)
         key_seed = randomness[0:(SECURITY_LEVEL/4)]
         document = randomness[(SECURITY_LEVEL/4):]
@@ -36,7 +34,7 @@ def test( num_trials, seed ):
         if bacuov_verify(pk, document, sig) == True:
             num_successes += 1
 
-    print "Ran", num_trials, "trials with", num_successes, "successes and", (num_integrity_failures + num_decoding_failures), "failures."
+    print "Ran", num_trials, "trials with", num_successes, "successes and", (num_trials - num_successes), "failures."
     print "Failures:"
     print " *", (num_trials-num_successes)
     print "Successes:"

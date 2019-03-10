@@ -49,7 +49,7 @@ int gfpcirc_zero( gfpcirc_element* elm )
     int i;
     for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
-        gfp_zero( &(elm->data[i]) );
+        elm->data[i] = 0;
     }
     return 1;
 }
@@ -57,10 +57,10 @@ int gfpcirc_zero( gfpcirc_element* elm )
 int gfpcirc_one( gfpcirc_element* elm )
 {
     int i;
-    gfp_one( &(elm->data[0]) );
+    elm->data[0] = 1;
     for( i = 1 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
-        gfp_zero( &(elm->data[i]) );
+        elm->data[i] = 0;
     }
     return 1;
 }
@@ -239,11 +239,11 @@ int gfpcirc_flr( gfpcirc_element * elm )
 {
 	int i;
 	gfp_element e;
-	for( i = 1 ; i < DEGREE_OF_CIRCULANCY ; ++i )
+	for( i = 1 ; i <= DEGREE_OF_CIRCULANCY/2 ; ++i )
 	{
 		e = elm->data[i];
-		elm->data[i] = elm->data[DEGREE_OF_CIRCULANCY+1-i];
-		elm->data[DEGREE_OF_CIRCULANCY+1-i] = e;
+		elm->data[i] = elm->data[DEGREE_OF_CIRCULANCY-i];
+		elm->data[DEGREE_OF_CIRCULANCY-i] = e;
 	}
 
 	return 1;
