@@ -681,3 +681,81 @@ int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuo
     return valid;
 }
 
+/**
+ * bacuov_pack_length
+ * Compute the length of the buffer for the given number of field
+ * elements, in bytes, after packing them.
+ */ 
+int bacuov_pack_length( int num_field_elements )
+{
+    return (num_field_elements * GFP_NUMBITS + 7) / 8;
+}
+
+/**
+ * bacuov_pack
+ * Turn a list of field elements, represented as bytes, into a much
+ * denser string of bytes.
+ */
+void bacuov_pack( unsigned char * dest_buffer, unsigned char * source_elements, int num_elements )
+{
+    int i, j;
+    int position;
+    unsigned char bit;
+
+    position = 0;
+
+    // set to zero
+    for( i = 0 ; i < bacuov_pack_length(num_elements) ; ++i )
+    {
+        dest_buffer[i] = 0;
+    }
+
+    // for each element ...
+    for( i = 0 ; i < num_elements ; ++i )
+    {
+        // for each bit in the element
+        for( j = 0 ; j < GFP_NUMBITS ; ++j )
+        {
+            bit = (source_elements[i] >> j) & 1;
+            // set the matching bit in the destination buffer
+            bit = bit << (position % 8);
+            dest_buffer[position/8] = dest_buffer[position/8] | bit;
+            position = position + 1;
+        }
+    }
+}
+
+/**
+ * bacuov_unpack
+ * Turn a dense stream of bytes representing field elements, into a
+ * list of such field elements where each byte represents one indi-
+ * vidually.
+ */
+void bacuov_unpack( unsigned char * dest_elements, unsigned char * source_buffer, int num_elements )
+{
+    int i, j;
+    int position;
+    unsigned char bit;
+
+    position = 0;
+
+    // set destination to zero
+    for( i = 0 ; i < num_elements ; ++i )
+    {
+        dest_elements[i] = 0;
+    }
+
+    // for each element ...
+    for( i = 0 ; i < num_elements ; ++i )
+    {
+        // for each bit in the element
+        for( j = 0 ; j < GFP_NUMBITS ; ++j )
+        {
+            bit = (source_buffer[position/8] >> (position % 8)) & 1;
+            bit = bit << (j % GFP_NUMBITS);
+            dest_elements[i] = dest_elements[i] ^ bit;
+            position = position + 1;
+        }
+    }
+}
+
