@@ -20,6 +20,12 @@ int main( int argc, char ** argv )
     int num_trials, trial_index;
     int i;
 
+    if( argc < 3 )
+    {
+        printf("Usage: ./test_pack [num_trials] [random seed, in hex]\n");
+        return 0;
+    }
+
     // get seed
     seed_length = strlen(argv[2])/2;
     seed = malloc(seed_length);

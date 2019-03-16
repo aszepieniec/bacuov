@@ -11,7 +11,7 @@
 // #endif
 
 #ifndef DEGREE_OF_CIRCULANCY
-#define DEGREE_OF_CIRCULANCY 3
+#define DEGREE_OF_CIRCULANCY 8
 #endif
 
 #ifndef SECURITY_LEVEL
@@ -19,11 +19,11 @@
 #endif
 
 #ifndef BACUOV_PARAM_O
-#define BACUOV_PARAM_O 2
+#define BACUOV_PARAM_O 7
 #endif
 
 #ifndef BACUOV_PARAM_V
-#define BACUOV_PARAM_V 7
+#define BACUOV_PARAM_V 99
 #endif
 
 #ifndef BACUOV_PARAM_M
@@ -60,12 +60,12 @@ void bacuov_secret_key_destroy( bacuov_secret_key sk );
 void bacuov_public_key_init( bacuov_public_key * sk );
 void bacuov_public_key_destroy( bacuov_public_key sk );
 void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned char * randomness );
-void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * msg, int msg_len );
-int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuov_signature * sig );
+void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, const unsigned char * msg, int msg_len );
+int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len, bacuov_signature * sig );
 
 #define bacuov_pack_length(num_field_elements) ((num_field_elements * GFP_NUMBITS + 7) / 8)
 void bacuov_pack( unsigned char * dest_buffer, unsigned char * source_elements, int num_elements );
-void bacuov_unpack( unsigned char * dest_elements, unsigned char * source_buffer, int num_elements );
+void bacuov_unpack( unsigned char * dest_elements, const unsigned char * source_buffer, int num_elements );
 
 #endif
 

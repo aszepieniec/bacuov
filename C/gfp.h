@@ -6,7 +6,7 @@
 #define GF_PRIME_MODULUS 31
 #endif
 
-#ifndef GFP_NUMBITES
+#ifndef GFP_NUMBITS
 #define GFP_NUMBITS 8
 #endif
 

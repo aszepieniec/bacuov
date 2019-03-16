@@ -399,7 +399,7 @@ void gfpem_base_multiply( gfpematrix * dest, gfpmatrix lhs, gfpematrix rhs )
 	}
 }
 
-void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * msg, int msg_len )
+void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, const unsigned char * msg, int msg_len )
 {
 
     unsigned char randomness[sizeof(sk.seed) + 32 + 1];
@@ -450,6 +450,7 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
     {
         randomness[i] = sk.seed[i];
     }
+
     FIPS202_SHA3_256(msg, msg_len, randomness + SECURITY_LEVEL/4);
 
     // hash to vector
@@ -573,7 +574,7 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * 
     gfpem_destroy(update);
 }
 
-int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuov_signature * sig )
+int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len, bacuov_signature * sig )
 {
     gfpcircmatrix Pi0V0V, Pi0VVN;
     gfpmatrix Pi0V0V_pressed, Pi0VVN_pressed, PiVNVN_pressed, Pi0N0N_pressed;
@@ -721,7 +722,7 @@ void bacuov_pack( unsigned char * dest_buffer, unsigned char * source_elements, 
  * list of such field elements where each byte represents one indi-
  * vidually.
  */
-void bacuov_unpack( unsigned char * dest_elements, unsigned char * source_buffer, int num_elements )
+void bacuov_unpack( unsigned char * dest_elements, const unsigned char * source_buffer, int num_elements )
 {
     int i, j;
     int position;

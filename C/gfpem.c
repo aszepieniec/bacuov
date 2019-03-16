@@ -1045,8 +1045,6 @@ int gfpem_inverse( gfpematrix inv, gfpematrix mat )
 
     if( 0 == invertible )
     {
-        printf("reduced echelon form:\n");
-        gfpem_print(concat);
         gfpem_destroy(concat);
         return 0;
     }
