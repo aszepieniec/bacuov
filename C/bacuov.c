@@ -250,12 +250,10 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         // compute PP[i][V:N,V:N]
         gfpcircm_transpose(&sk->S);
         gfpcircm_copy(tempVO, sk->FFvo[i]);
-        //gfpcircm_flip(tempVO);
         gfpcircm_multiply(&matOO, sk->S, tempVO);
         gfpcircm_transpose(&matOO);
 
         gfpcircm_copy(tempVV, sk->FFvv[i]);
-        //gfpcircm_flipshift(tempVV, 1);
         gfpcircm_multiply(&tempOV, sk->S, tempVV);
         gfpcircm_transpose(&sk->S);
         gfpcircm_multiply(&pk->PPoo[i], tempOV, sk->S);
@@ -346,25 +344,28 @@ void gfpcircm_press_circulant( gfpmatrix * dest, gfpcircmatrix source )
  */
 void gfpem_multiply_base( gfpematrix * dest, gfpematrix lhs, gfpmatrix rhs )
 {
-	gfpe_element r, t;
-	int i, j, k;
+	int i, j, k, l;
+    unsigned long int temp[EXTENSION_DEGREE];
 	
-	for( k = 0 ; k < EXTENSION_DEGREE ; ++k )
-	{
-		r.data[k] = 0;
-	}
-
 	for( i = 0 ; i < lhs.height ; ++i )
 	{
 		for( j = 0 ; j < rhs.width ; ++j )
 		{
-			gfpe_zero(&dest->data[i*dest->width + j]);
+            for( l = 0 ; l < EXTENSION_DEGREE ; ++l )
+            {
+                temp[l] = 0;
+            }
 			for( k = 0 ; k < lhs.width ; ++k )
 			{
-				r.data[0] = rhs.data[k*rhs.width + j];
-				gfpe_multiply(&t, lhs.data[i*lhs.width + k], r); // <-- target for optimization
-				gfpe_add(&dest->data[i*dest->width + j], dest->data[i*dest->width + j], t);
+                for( l = 0 ; l < EXTENSION_DEGREE ; ++l )
+                {
+                    temp[l] = temp[l] + lhs.data[i*lhs.width + k].data[l] * rhs.data[k*rhs.width + j];
+                }
 			}
+            for( l = 0 ; l < EXTENSION_DEGREE ; ++l )
+            {
+                dest->data[i*dest->width + j].data[l] = temp[l] % GF_PRIME_MODULUS;
+            }
 		}
 	}
 }
@@ -376,25 +377,28 @@ void gfpem_multiply_base( gfpematrix * dest, gfpematrix lhs, gfpmatrix rhs )
  */
 void gfpem_base_multiply( gfpematrix * dest, gfpmatrix lhs, gfpematrix rhs )
 {
-	gfpe_element l, t;
-	int i, j, k;
+	int i, j, k, l;
+    unsigned long temp[EXTENSION_DEGREE];
 	
-	for( k = 0 ; k < EXTENSION_DEGREE ; ++k )
-	{
-		l.data[k] = 0;
-	}
-
 	for( i = 0 ; i < lhs.height ; ++i )
 	{
 		for( j = 0 ; j < rhs.width ; ++j )
 		{
-			gfpe_zero(&dest->data[i*dest->width + j]);
+            for( l = 0 ; l < EXTENSION_DEGREE ; ++l )
+            {
+                temp[l] = 0;
+            }
 			for( k = 0 ; k < lhs.width ; ++k )
 			{
-				l.data[0] = lhs.data[i*lhs.width + k];
-				gfpe_multiply(&t, l, rhs.data[k*rhs.width + j]); // <-- target for optimization
-				gfpe_add(&dest->data[i*dest->width + j], dest->data[i*dest->width + j], t);
+                for( l = 0 ; l < EXTENSION_DEGREE ; ++l )
+                {
+                    temp[l] = temp[l] + lhs.data[i*lhs.width + k] * rhs.data[k*rhs.width + j].data[l];
+                }
 			}
+            for( l = 0 ; l < EXTENSION_DEGREE ; ++l )
+            {
+                dest->data[i*dest->width + j].data[l] = temp[l] % GF_PRIME_MODULUS;
+            }
 		}
 	}
 }

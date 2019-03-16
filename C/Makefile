@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -I.
-DEPS = bacuov.c gfp.c gfpcircm.h gfpm.c Keccak-readable-and-compact-c89.c bacuov.h gfpcirc.c gfpe.c gfpm.h test_algebra.c csprng.c gfpcirc.h gfpe.h gfpx.c test_bacuov.c csprng.h gfpcircm.c gfp.h gfpx.h gfpem.c gfpem.h
+DEPS = bacuov.c gfp.c gfpcircm.h gfpm.c Keccak-readable-and-compact-c89.c bacuov.h gfpcirc.c gfpe.c gfpm.h test_algebra.c csprng.c gfpcirc.h gfpe.h gfpx.c test_bacuov.c csprng.h gfpcircm.c gfp.h gfpx.h gfpem.c gfpem.h api.h test_pack.c benchmark.c api.c
 ALGEBRA = gfp.c gfpcircm.h gfpm.c gfpcirc.c gfpe.c gfpm.h gfpcirc.h gfpe.h gfpx.c gfpcircm.c gfp.h gfpx.h gfpem.c gfpem.h
 KECCAK = Keccak-readable-and-compact-c89.c
 
@@ -11,7 +11,10 @@ bacuov: $(DEPS)
 	$(CC) -o test_bacuov test_bacuov.c bacuov.c $(ALGEBRA) $(KECCAK) -DGF_PRIME_MODULUS=7 -DEXTENSION_DEGREE=5 -DDEFINING_POLYNOMIAL=0x0102010501 -DDEGREE_OF_CIRCULANCY=11 -DDEBUG
 
 pack: $(DEPS)
-	$(CC) -o test_pack test_pack.c bacuov.c $(ALGEBRA) $(KECCAK) -DGF_PRIME_MODULUS=7 -DEXTENSION_DEGREE=5 -DDEFINING_POLYNOMIAL=0x0102010501 -DDEGREE_OF_CIRCULANCY=11 -DDEBUG
+	$(CC) -o test_pack test_pack.c bacuov.c $(ALGEBRA) $(KECCAK) -DGF_PRIME_MODULUS=7 -DGFP_NUMBITS=3 -DEXTENSION_DEGREE=5 -DDEFINING_POLYNOMIAL=0x0102010501 -DDEGREE_OF_CIRCULANCY=11 -DDEBUG
+
+bench: $(DEPS)
+	$(CC) -o benchmark benchmark.c bacuov.c api.c $(ALGEBRA) $(KECCAK) -DGF_PRIME_MODULUS=7 -DGFP_NUMBITS=3 -DEXTENSION_DEGREE=5 -DDEFINING_POLYNOMIAL=0x0102010501 -DDEGREE_OF_CIRCULANCY=11 -DDEBUG
 
 clean: 
 	rm -f test_algebra

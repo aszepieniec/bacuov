@@ -89,9 +89,9 @@ int main( int argc, char ** argv )
     }
 
     printf("Successfully ran %i trials.\nReport:\n", num_trials);
-    printf("Keygen -- %f seconds, %llu cycles\n", (double)(time_keygen / CLOCKS_PER_SEC) / num_trials, cycles_keygen);
-    printf("Sign -- %f seconds, %llu cycles\n", (double)(time_signature / CLOCKS_PER_SEC) / num_trials, cycles_signature);
-    printf("Verify -- %f seconds, %llu cycles\n", (double)(time_verification / CLOCKS_PER_SEC) / num_trials, cycles_verification);
+    printf("Keygen -- %f seconds, %llu cycles\n", (double)(time_keygen / (double)CLOCKS_PER_SEC) / (double)num_trials, cycles_keygen);
+    printf("Sign -- %f seconds, %llu cycles\n", (double)(time_signature / (double)CLOCKS_PER_SEC) / (double)num_trials, cycles_signature);
+    printf("Verify -- %f seconds, %llu cycles\n", (double)(time_verification / (double)CLOCKS_PER_SEC) / (double)num_trials, cycles_verification);
 
     return 1;
 }
