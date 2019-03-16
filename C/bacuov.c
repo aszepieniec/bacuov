@@ -682,16 +682,6 @@ int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuo
 }
 
 /**
- * bacuov_pack_length
- * Compute the length of the buffer for the given number of field
- * elements, in bytes, after packing them.
- */ 
-int bacuov_pack_length( int num_field_elements )
-{
-    return (num_field_elements * GFP_NUMBITS + 7) / 8;
-}
-
-/**
  * bacuov_pack
  * Turn a list of field elements, represented as bytes, into a much
  * denser string of bytes.

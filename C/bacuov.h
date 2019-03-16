@@ -63,7 +63,7 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
 void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, unsigned char * msg, int msg_len );
 int bacuov_verify( bacuov_public_key pk, unsigned char * msg, int msg_len, bacuov_signature * sig );
 
-int bacuov_pack_length( int num_field_elements );
+#define bacuov_pack_length(num_field_elements) ((num_field_elements * GFP_NUMBITS + 7) / 8)
 void bacuov_pack( unsigned char * dest_buffer, unsigned char * source_elements, int num_elements );
 void bacuov_unpack( unsigned char * dest_elements, unsigned char * source_buffer, int num_elements );
 

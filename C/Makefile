@@ -10,8 +10,12 @@ algebra: $(DEPS)
 bacuov: $(DEPS)
 	$(CC) -o test_bacuov test_bacuov.c bacuov.c $(ALGEBRA) $(KECCAK) -DGF_PRIME_MODULUS=7 -DEXTENSION_DEGREE=5 -DDEFINING_POLYNOMIAL=0x0102010501 -DDEGREE_OF_CIRCULANCY=11 -DDEBUG
 
+pack: $(DEPS)
+	$(CC) -o test_pack test_pack.c bacuov.c $(ALGEBRA) $(KECCAK) -DGF_PRIME_MODULUS=7 -DEXTENSION_DEGREE=5 -DDEFINING_POLYNOMIAL=0x0102010501 -DDEGREE_OF_CIRCULANCY=11 -DDEBUG
+
 clean: 
 	rm -f test_algebra
 	rm -f test_bacuov
+	rm -f test_pack
 
 
