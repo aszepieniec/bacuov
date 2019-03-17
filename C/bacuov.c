@@ -208,7 +208,7 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     tempVV = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
     tempVO = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
     tempOV = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_V);
-    matVO = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
+    //matVO = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
     matOO = gfpcircm_init(BACUOV_PARAM_O, BACUOV_PARAM_O);
 
     // copy over randomness to secret key
@@ -244,9 +244,12 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
         gfpcircm_multiply(&sk->FFvo[i], Pi0V0V, sk->S);
         gfpcircm_negate(sk->FFvo[i]);
 
-        gfpcircm_copy(matVO, Pi0VVN);
-        gfpcircm_add(sk->FFvo[i], sk->FFvo[i], matVO);
+        //gfpcircm_copy(matVO, Pi0VVN);
+        //gfpcircm_add(sk->FFvo[i], sk->FFvo[i], matVO);
+	gfpcircm_add(sk->FFvo[i], sk->FFvo[i], Pi0VVN);
 
+	// TODO: get rid of more temp variables
+	
         // compute PP[i][V:N,V:N]
         gfpcircm_transpose(&sk->S);
         gfpcircm_copy(tempVO, sk->FFvo[i]);
@@ -271,7 +274,7 @@ void bacuov_keygen( bacuov_secret_key * sk, bacuov_public_key * pk, unsigned cha
     gfpcircm_destroy(tempVO);
     gfpcircm_destroy(tempOV);
     gfpcircm_destroy(matOO);
-    gfpcircm_destroy(matVO);
+    //gfpcircm_destroy(matVO);
 }
 
 /**

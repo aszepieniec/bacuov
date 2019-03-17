@@ -318,12 +318,14 @@ int gfpcircm_transpose( gfpcircmatrix * trans )
 int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix right )
 {
     unsigned  int i, j, k;
-    gfpcirc_element prod, sum, lsum, lhs, rhs;
+    unsigned int l, m;
+    //gfpcirc_element prod, sum, lsum, lhs, rhs;
+    unsigned long int sum[DEGREE_OF_CIRCULANCY];
     gfpcirc_element * data;
 
-    prod = gfpcirc_init(1);
-    sum = gfpcirc_init(1);
-    lsum = gfpcirc_init(1);
+    //prod = gfpcirc_init(1);
+    //sum = gfpcirc_init(1);
+    //lsum = gfpcirc_init(1);
 
     data = malloc(sizeof(gfpcirc_element) * dest->width * dest->height);
     for( i = 0 ; i < dest->height ; ++i )
@@ -346,16 +348,31 @@ int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix r
     {
         for( j = 0 ; j < right.width ; ++j )
         {
-            gfpcirc_zero(&sum);
+            //gfpcirc_zero(&sum);
+	    for( l = 0 ; l < DEGREE_OF_CIRCULANCY ; ++l )
+            {
+		sum[l] = 0;
+	    }
             for( k = 0 ; k < left.width ; ++k )
             {
-                gfpcirc_copy(&lsum, &sum);
-                lhs = left.data[i*left.width + k];
-                rhs = right.data[k*right.width + j];
-                gfpcirc_multiply(&prod, lhs, rhs);
-                gfpcirc_add(&sum, lsum, prod);
+                //gfpcirc_copy(&lsum, &sum);
+                //lhs = left.data[i*left.width + k];
+                //rhs = right.data[k*right.width + j];
+                //gfpcirc_multiply(&prod, lhs, rhs);
+                //gfpcirc_add(&sum, lsum, prod);
+		for( l = 0 ; l < DEGREE_OF_CIRCULANCY ; ++l )
+		{
+		    for( m = 0 ; m < DEGREE_OF_CIRCULANCY ; ++m )
+                    {
+			sum[(l+m)%DEGREE_OF_CIRCULANCY] += left.data[i*left.width + k].data[l] * right.data[k*right.width + j].data[m];
+	            }
+		}
             }
-            gfpcirc_copy(&data[i*dest->width + j], &sum);
+            //gfpcirc_copy(&data[i*dest->width + j], &sum);
+	    for( l = 0 ; l < DEGREE_OF_CIRCULANCY ; ++l )
+            {
+		data[i*dest->width + j].data[l] = sum[l] % GF_PRIME_MODULUS;
+            }
         }
     }
 
@@ -363,16 +380,17 @@ int gfpcircm_multiply( gfpcircmatrix * dest, gfpcircmatrix left, gfpcircmatrix r
     {
         for( j = 0 ; j < dest->width ; ++j )
         {
-            lhs = dest->data[i*dest->width + j];
-            gfpcirc_destroy(lhs);
+            //lhs = dest->data[i*dest->width + j];
+            //gfpcirc_destroy(lhs);
+	    gfpcirc_destroy(dest->data[i*dest->width + j]);
         }
     }
     free(dest->data);
     dest->data = data;
 
-    gfpcirc_destroy(prod);
-    gfpcirc_destroy(sum);
-    gfpcirc_destroy(lsum);
+    //gfpcirc_destroy(prod);
+    //gfpcirc_destroy(sum);
+    //gfpcirc_destroy(lsum);
 
     return 1;
 }
