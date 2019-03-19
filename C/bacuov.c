@@ -581,15 +581,19 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, const unsigned c
     gfpem_destroy(update);
 }
 
+#define BAC_GET(mat, i, j) (mat.data[(i/DEGREE_OF_CIRCULANCY)*mat.width + (j/DEGREE_OF_CIRCULANCY)].data[(j+i) % DEGREE_OF_CIRCULANCY])
+
 int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len, bacuov_signature * sig )
 {
     gfpcircmatrix Pi0V0V, Pi0VVN;
-    gfpmatrix Pi0V0V_pressed, Pi0VVN_pressed, PiVNVN_pressed, Pi0N0N_pressed;
+    gfpmatrix Pi0V0V_pressed, Pi0VVN_pressed, PiVNVN_pressed;
     gfpematrix evaluation, target;
+    unsigned long int inner_product_integers[EXTENSION_DEGREE];
+    unsigned long int temp_row_integers[(BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY*EXTENSION_DEGREE];
+    gfpe_element ext_elm;
     gfpematrix signature;
-    gfpematrix temp_row, temp_inner_product;
     int valid;
-    int i, j, k;
+    int i, j, k, l, m;
     unsigned char array[BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY * EXTENSION_DEGREE];
 
     // init matrices
@@ -598,12 +602,9 @@ int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len,
     Pi0V0V_pressed = gfpm_init(BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY, BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY);
     Pi0VVN_pressed = gfpm_init(BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY, BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY);
     PiVNVN_pressed = gfpm_init(BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY, BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY);
-    Pi0N0N_pressed = gfpm_init((BACUOV_PARAM_V+BACUOV_PARAM_O) * DEGREE_OF_CIRCULANCY, (BACUOV_PARAM_V+BACUOV_PARAM_O) * DEGREE_OF_CIRCULANCY);
     evaluation = gfpem_init(BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY, 1);
     target = gfpem_init(BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY, 1);
     signature = gfpem_init((BACUOV_PARAM_V+BACUOV_PARAM_O) * DEGREE_OF_CIRCULANCY, 1);
-    temp_row = gfpem_init(1, (BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY);
-    temp_inner_product = gfpem_init(1,1);
 
     // copy signature
     for( i = 0 ; i < (BACUOV_PARAM_V + BACUOV_PARAM_O) * DEGREE_OF_CIRCULANCY ; ++i )
@@ -616,49 +617,79 @@ int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len,
     {
         // populate top-left and top-right blocks of Pi
         bacuov_generate_vinegar_coefficients(&Pi0V0V, pk.seed_PCT, i);
-        bacuov_generate_linear_coefficients(&Pi0VVN, pk.seed_PCT, i);   
+        bacuov_generate_linear_coefficients(&Pi0VVN, pk.seed_PCT, i);
 
-        // press down matrix parts
+        // press down matrix parts // possible optimization: grab elements immediately from unpressed bac-form // actually, I tried that. It's slower.
         gfpcircm_press_anticirculant(&Pi0V0V_pressed, Pi0V0V);
         gfpcircm_press_anticirculant(&Pi0VVN_pressed, Pi0VVN);
         gfpcircm_press_anticirculant(&PiVNVN_pressed, pk.PPoo[i]);
 
-        // copy matrix parts into the big thing
-        // starting with top-left vinegar-vinegar block ...
+        // compute matrix-vector product sig^T * P[i] 
+	    for( j = 0 ; j < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++j )
+        {
+            for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+            {
+                temp_row_integers[j*EXTENSION_DEGREE + m] = 0;
+            }
+	    }
         for( j = 0 ; j < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++j )
         {
-            for( k = 0 ; k < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++k )
+            for( k = 0 ; k < (BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
             {
-                Pi0N0N_pressed.data[j*Pi0N0N_pressed.width + k] = Pi0V0V_pressed.data[j*Pi0V0V_pressed.width + k];
+                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+                {
+                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * Pi0V0V_pressed.data[j*Pi0V0V_pressed.width + k];
+                }
+            }
+            for( k = BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; k < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
+            {
+                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+                {
+                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * Pi0VVN_pressed.data[j*Pi0VVN_pressed.width + k - BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY];
+                }
             }
         }
-        // ... then the vinegar-oil and oil-vinegar blocks ...
-        for( j = 0 ; j < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++j )
+        for( j = BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; j < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++j )
         {
-            for( k = 0 ; k < BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY ; ++k )
+            for( k = 0 ; k < (BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
             {
-                Pi0N0N_pressed.data[j*Pi0N0N_pressed.width + BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY + k] = Pi0VVN_pressed.data[j*Pi0VVN_pressed.width + k];
-                Pi0N0N_pressed.data[(BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY + k)*Pi0N0N_pressed.width + j] = Pi0VVN_pressed.data[j*Pi0VVN_pressed.width + k];
+                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+                {
+                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * Pi0VVN_pressed.data[k*Pi0VVN_pressed.width + j - BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY];
+                }
             }
-        }
-        // ... and lastly, the oil-oil block
-        for( j = 0 ; j < BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY ; ++j )
-        {
-            for( k = 0 ; k < BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY ; ++k )
+            for( k = BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; k < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
             {
-                Pi0N0N_pressed.data[(BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY+j)*Pi0N0N_pressed.width + BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY + k] = PiVNVN_pressed.data[j*PiVNVN_pressed.width + k];
+                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+                {
+                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * PiVNVN_pressed.data[(j-BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY)*PiVNVN_pressed.width + k - BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY];
+                }
             }
         }
 
-        // compute vector-matrix-vector product // <-- target for optimization
-        signature.height = 1;
-        signature.width = (BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY;
-        gfpem_multiply_base(&temp_row, signature, Pi0N0N_pressed);
-        signature.width = 1;
-        signature.height = (BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY;
-        gfpem_multiply(&temp_inner_product, temp_row, signature); 
-        gfpe_copy(&evaluation.data[i], temp_inner_product.data[0]);
-    }
+        // compute inner product (sig^T * P[i]) * sig
+        for( k = 0 ; k < EXTENSION_DEGREE ; ++k )
+        {
+            inner_product_integers[k] = 0;
+        }
+        for( j = 0 ; j < (BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY ; ++j )
+        {
+            for( k = 0 ; k < EXTENSION_DEGREE ; ++k )
+            {
+                ext_elm.data[k] = temp_row_integers[j*EXTENSION_DEGREE + k] % GF_PRIME_MODULUS; // can't drop modular reduction because the result is stored in a char
+            }
+            gfpe_multiply(&ext_elm, ext_elm, signature.data[j]);
+            for( k = 0 ; k < EXTENSION_DEGREE ; ++k )
+            {
+                inner_product_integers[k] = inner_product_integers[k] + ext_elm.data[k];
+            }
+        }
+        for( k = 0 ; k < EXTENSION_DEGREE ; ++k )
+        {
+            evaluation.data[i].data[k] = inner_product_integers[k] % GF_PRIME_MODULUS;
+        }
+
+   }
 
     // get target hash-of-document
     FIPS202_SHAKE256(msg, msg_len, array, sizeof(array));
@@ -679,12 +710,9 @@ int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len,
     gfpm_destroy(Pi0V0V_pressed);
     gfpm_destroy(Pi0VVN_pressed);
     gfpm_destroy(PiVNVN_pressed);
-    gfpm_destroy(Pi0N0N_pressed);
     gfpem_destroy(evaluation);
     gfpem_destroy(target);
     gfpem_destroy(signature);
-    gfpem_destroy(temp_row);
-    gfpem_destroy(temp_inner_product);
 
     return valid;
 }
