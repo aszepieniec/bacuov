@@ -156,7 +156,7 @@ int gfpcirc_negate( gfpcirc_element * res, gfpcirc_element elm )
 
 int gfpcirc_multiply( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_element rhs )
 {
-    gfp_element data[2*DEGREE_OF_CIRCULANCY];
+    unsigned long int data[2*DEGREE_OF_CIRCULANCY];
     int i, j;
     for( i = 0 ; i < 2*DEGREE_OF_CIRCULANCY ; ++i )
     {
@@ -166,13 +166,13 @@ int gfpcirc_multiply( gfpcirc_element * res, gfpcirc_element lhs, gfpcirc_elemen
     {
         for( j = 0 ; j < DEGREE_OF_CIRCULANCY ; ++j )
         {
-            data[i+j] = (data[i+j] + (lhs.data[i] * rhs.data[j])) % GF_PRIME_MODULUS;
+            data[i+j] = data[i+j] + (lhs.data[i] * rhs.data[j]);
         }
     }
     /* reduce modulo x^l-1 */
     for( i = 0 ; i < DEGREE_OF_CIRCULANCY ; ++i )
     {
-        res->data[i] = ((int)data[i] + (int)data[DEGREE_OF_CIRCULANCY+i]) % GF_PRIME_MODULUS;
+        res->data[i] = (data[i] + data[DEGREE_OF_CIRCULANCY+i]) % GF_PRIME_MODULUS;
     }
 
     return 1;
