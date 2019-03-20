@@ -36,7 +36,7 @@ gfpmatrix gfpm_init( unsigned  int height, unsigned  int width )
     {
         for( j = 0 ; j < width ; ++j )
         {
-            mat.data[i*width + j] = gfp_init(0);
+            mat.data[i*width + j] = 0;
         }
     }
     return mat;
@@ -52,14 +52,6 @@ gfpmatrix gfpm_init( unsigned  int height, unsigned  int width )
  */
 int gfpm_destroy( gfpmatrix fm )
 {
-    int i, j;
-    for( i = 0 ; i < fm.height ; ++i )
-    {
-        for( j = 0 ; j < fm.width ; ++j )
-        {
-            gfp_destroy(fm.data[i*fm.width + j]);
-        }
-    }
     free(fm.data);
     fm.width = 0;
     fm.height = 0;
@@ -84,7 +76,7 @@ int gfpm_copy( gfpmatrix dest, gfpmatrix source )
     {
         for( j = 0 ; j < source.width ; ++j )
         {
-            gfp_copy(&dest.data[i*dest.width + j], source.data[i*source.width + j]);
+            dest.data[i*dest.width + j] = source.data[i*source.width + j];
         }
     }
 
@@ -119,9 +111,9 @@ int gfpm_eye( gfpmatrix eye )
     {
         for( j = 0 ; j < eye.width ; ++j )
         {
-            gfp_zero(&eye.data[i*eye.width + j]);
+            eye.data[i*eye.width + j] = 0;
         }
-        gfp_one(&eye.data[i*eye.width + i]);
+        eye.data[i*eye.width + i] = 1;
     }
     return 1;
 }
@@ -137,12 +129,6 @@ int gfpm_is_eye( gfpmatrix eye )
 {
     unsigned int i, j;
     int b = 1;
-    gfp_element one, zero;
-    
-    one = gfp_init(1);
-    zero = gfp_init(1);
-    gfp_one(&one);
-    gfp_zero(&zero);
 
     for( i = 0 ; i < eye.height ; ++i )
     {
@@ -150,17 +136,14 @@ int gfpm_is_eye( gfpmatrix eye )
         {
             if( i == j )
             {
-                b = b & gfp_compare(eye.data[i*eye.width + j], one);
+                b = b & (eye.data[i*eye.width + j] == 1);
             }
             else
             {
-                b = b & gfp_compare(eye.data[i*eye.width + j], zero);
+                b = b & (eye.data[i*eye.width + j] == 0);
             }
         }
     }
-
-    gfp_destroy(one);
-    gfp_destroy(zero);
 
     return b;
 }
@@ -186,7 +169,7 @@ int gfpm_equals( gfpmatrix lhs, gfpmatrix rhs )
     {
         for( j = 0 ; j < lhs.width ; ++j )
         {
-            b = b & gfp_compare(lhs.data[lhs.width*i + j], rhs.data[rhs.width*i + j]);
+            b = b & (lhs.data[lhs.width*i + j] == rhs.data[rhs.width*i + j]);
         }
     }
 
@@ -208,7 +191,7 @@ int gfpm_zeros( gfpmatrix zero )
     {
         for( j = 0 ; j < zero.width ; ++j )
         {
-            gfp_zero(&zero.data[i*zero.width + j]);
+            zero.data[i*zero.width + j] = 0;
         }
     }
     return 1;
@@ -373,7 +356,7 @@ int gfpm_transpose( gfpmatrix * trans )
     {
         for( j = 0 ; j < trans->width ; ++j )
         {
-            gfp_copy(&trans->data[i*trans->width + j], T.data[j*T.width + i]);
+            trans->data[i*trans->width + j] = T.data[j*T.width + i];
         }
     }
 
@@ -403,22 +386,11 @@ int gfpm_transpose( gfpmatrix * trans )
  */
 int gfpm_multiply( gfpmatrix * dest, gfpmatrix left, gfpmatrix right )
 {
-    unsigned  int i, j, k;
-    gfp_element prod, sum, lsum;
+    unsigned int i, j, k;
+    unsigned long int acc;
     gfp_element * data;
 
-    prod = gfp_init(1);
-    sum = gfp_init(1);
-    lsum = gfp_init(1);
-
     data = malloc(sizeof(gfp_element) * dest->width * dest->height);
-    for( i = 0 ; i < dest->height ; ++i )
-    {
-        for( j = 0 ; j < dest->width ; ++j )
-        {
-            data[i*dest->width + j] = gfp_init(0);
-        }
-    }
 
     #ifdef DEBUG
         if( dest->height != left.height || dest->width != right.width || left.width != right.height )
@@ -432,30 +404,17 @@ int gfpm_multiply( gfpmatrix * dest, gfpmatrix left, gfpmatrix right )
     {
         for( j = 0 ; j < right.width ; ++j )
         {
-            gfp_zero(&sum);
+            acc = 0;
             for( k = 0 ; k < left.width ; ++k )
             {
-                gfp_copy(&lsum, sum);
-                gfp_multiply(&prod, left.data[i*left.width + k], right.data[k*right.width + j]);
-                gfp_add(&sum, lsum, prod);
+                acc = acc + left.data[i*left.width + k] * right.data[k*right.width + j];
             }
-            gfp_copy(&data[i*dest->width + j], sum);
+            data[i*dest->width + j] = acc % GF_PRIME_MODULUS;
         }
     }
 
-    for( i = 0 ; i < dest->height ; ++i )
-    {
-        for( j = 0 ; j < dest->width ; ++j )
-        {
-            gfp_destroy(dest->data[i*dest->width + j]);
-        }
-    }
     free(dest->data);
     dest->data = data;
-
-    gfp_destroy(prod);
-    gfp_destroy(sum);
-    gfp_destroy(lsum);
 
     return 1;
 }
@@ -483,12 +442,8 @@ int gfpm_multiply( gfpmatrix * dest, gfpmatrix left, gfpmatrix right )
 int gfpm_multiply_transpose( gfpmatrix * dest, gfpmatrix left, gfpmatrix rightT )
 {
     unsigned  int i, j, k;
-    gfp_element prod, sum, lsum;
+    unsigned long int acc;
     gfp_element * data;
-
-    prod = gfp_init(1);
-    sum = gfp_init(1);
-    lsum = gfp_init(1);
 
     #ifdef DEBUG
         if( dest->height != left.height || dest->width != rightT.height || left.width != rightT.width )
@@ -499,42 +454,22 @@ int gfpm_multiply_transpose( gfpmatrix * dest, gfpmatrix left, gfpmatrix rightT 
     #endif
 
     data = malloc(sizeof(gfp_element) * dest->width * dest->height);
-    for( i = 0 ; i < dest->height ; ++i )
-    {
-        for( j = 0 ; j < dest->width ; ++j )
-        {
-            data[i*dest->width + j] = gfp_init(0);
-        }
-    }
 
     for( i = 0 ; i < left.height ; ++i )
     {
         for( j = 0 ; j < rightT.height ; ++j )
         {
-            gfp_zero(&sum);
+	    acc = 0;
             for( k = 0 ; k < left.width ; ++k )
             {
-                gfp_copy(&lsum, sum);
-                gfp_multiply(&prod, left.data[i*left.width + k], rightT.data[j*rightT.width + k]);
-                gfp_add(&sum, lsum, prod);
+                acc = acc + left.data[i*left.width + k] * rightT.data[j*rightT.width + k];
             }
-            gfp_copy(&data[i*dest->width + j], sum);
+            data[i*dest->width + j] = acc % GF_PRIME_MODULUS;
         }
     }
 
-    for( i = 0 ; i < dest->height ; ++i )
-    {
-        for( j = 0 ; j < dest->width ; ++j )
-        {
-            gfp_destroy(dest->data[i*dest->width + j]);
-        }
-    }
     free(dest->data);
     dest->data = data;
-
-    gfp_destroy(prod);
-    gfp_destroy(sum);
-    gfp_destroy(lsum);
 
     return 1;
 }
@@ -562,12 +497,8 @@ int gfpm_multiply_transpose( gfpmatrix * dest, gfpmatrix left, gfpmatrix rightT 
 int gfpm_transpose_multiply( gfpmatrix * dest, gfpmatrix leftT, gfpmatrix right )
 {
     unsigned  int i, j, k;
-    gfp_element prod, sum, lsum;
+    unsigned long int acc;
     gfp_element * data;
-
-    prod = gfp_init(1);
-    sum = gfp_init(1);
-    lsum = gfp_init(1);
 
     #ifdef DEBUG
         if( dest->height != leftT.width || dest->width != right.width || leftT.height != right.height )
@@ -578,42 +509,22 @@ int gfpm_transpose_multiply( gfpmatrix * dest, gfpmatrix leftT, gfpmatrix right 
     #endif
 
     data = malloc(sizeof(gfp_element)*dest->width*dest->height);
-    for( i = 0 ; i < dest->height ; ++i )
-    {
-        for( j = 0 ; j < dest->width ; ++j )
-        {
-            data[i*dest->width + j] = gfp_init(0);
-        }
-    }
 
     for( i = 0 ; i < leftT.width ; ++i )
     {
         for( j = 0 ; j < right.width ; ++j )
         {
-            gfp_zero(&sum);
+	    acc = 0;
             for( k = 0 ; k < leftT.height ; ++k )
             {
-                gfp_copy(&lsum, sum);
-                gfp_multiply(&prod, leftT.data[k*leftT.width + i], right.data[k*right.width + j]);
-                gfp_add(&sum, lsum, prod);
+                acc = acc + leftT.data[k*leftT.width + i] * right.data[k*right.width + j];
             }
-            gfp_copy(&data[i*dest->width + j], sum);
+            data[i*dest->width + j] = acc % GF_PRIME_MODULUS;
         }
     }
 
-    for( i = 0 ; i < dest->height ; ++i )
-    {
-        for( j = 0 ; j < dest->width ; ++j )
-        {
-            gfp_destroy(dest->data[i*dest->width + j]);
-        }
-    }
     free(dest->data);
     dest->data = data;
-
-    gfp_destroy(prod);
-    gfp_destroy(sum);
-    gfp_destroy(lsum);
 
     return 1;
 }
@@ -641,7 +552,7 @@ int gfpm_multiply_constant( gfpmatrix dest, gfpmatrix source, gfp_element consta
     {
         for( j = 0 ; j < dest.width ; ++j )
         {
-            gfp_multiply(&dest.data[i*dest.width + j], source.data[i*dest.width + j], constant);
+            dest.data[i*dest.width + j] = (source.data[i*dest.width + j] * constant) % GF_PRIME_MODULUS;
         }
     }
     return 1;
@@ -674,7 +585,7 @@ int gfpm_add( gfpmatrix dest, gfpmatrix left, gfpmatrix right )
     {
         for( j = 0 ; j < dest.width ; ++j )
         {
-            gfp_add(&dest.data[i*dest.width + j], left.data[i*left.width + j], right.data[i*right.width + j]);
+            dest.data[i*dest.width + j] = (left.data[i*left.width + j] + right.data[i*right.width + j]) % GF_PRIME_MODULUS;
         }
     }
 
@@ -698,11 +609,6 @@ int gfpm_weighted_sum( gfpmatrix dest, gfp_element left_constant, gfpmatrix left
 {
     unsigned  int i, j;
 
-    gfp_element lhs, rhs;
-
-    lhs = gfp_init(1);
-    rhs = gfp_init(1);
-
     #ifdef DEBUG
         if( dest.width != left_matrix.width || left_matrix.width != right_matrix.width || dest.height != left_matrix.height || left_matrix.height != right_matrix.height )
         {
@@ -715,14 +621,9 @@ int gfpm_weighted_sum( gfpmatrix dest, gfp_element left_constant, gfpmatrix left
     {
         for( j = 0 ; j < dest.width ; ++j )
         {
-            gfp_multiply(&lhs, left_matrix.data[i*left_matrix.width + j], left_constant);
-            gfp_multiply(&rhs, right_matrix.data[i*right_matrix.width + j], right_constant);
-            gfp_add(&dest.data[i*dest.width + j], lhs, rhs);
+            dest.data[i*dest.width + j] = (left_matrix.data[i*left_matrix.width + j] * left_constant + right_matrix.data[i*right_matrix.width + j] * right_constant) % GF_PRIME_MODULUS;
         }
     }
-
-    gfp_destroy(lhs);
-    gfp_destroy(rhs);
 
     return 1;
 }
@@ -742,20 +643,11 @@ int gfpm_weighted_sum( gfpmatrix dest, gfp_element left_constant, gfpmatrix left
 int gfpm_rowop( gfpmatrix mat, unsigned  int destrow, unsigned  int sourcerow, gfp_element constant, unsigned  int offset )
 {
     unsigned  int j;
-    gfp_element prod, sum;
-
-    prod = gfp_init(1);
-    sum = gfp_init(1);
 
     for( j = offset ; j < mat.width ; ++j )
     {
-        gfp_multiply(&prod, mat.data[sourcerow*mat.width + j], constant);
-        gfp_add(&sum, mat.data[destrow*mat.width + j], prod);
-        gfp_copy(&mat.data[destrow*mat.width + j], sum);
+	mat.data[destrow*mat.width + j] = (mat.data[destrow*mat.width + j] + mat.data[sourcerow*mat.width + j] * constant) % GF_PRIME_MODULUS;
     }
-
-    gfp_destroy(prod);
-    gfp_destroy(sum);
 
     return 1;
 }
@@ -774,17 +666,11 @@ int gfpm_rowop( gfpmatrix mat, unsigned  int destrow, unsigned  int sourcerow, g
 int gfpm_scalerow( gfpmatrix mat, unsigned  int rowidx, gfp_element constant )
 {
     unsigned  int j;
-    gfp_element temp;
-
-    temp = gfp_init(1);
 
     for( j = 0 ; j < mat.width ; ++j )
     {
-        gfp_multiply(&temp, mat.data[rowidx*mat.width + j], constant);
-        gfp_copy(&mat.data[rowidx*mat.width + j], temp);
+        mat.data[rowidx*mat.width + j] = (mat.data[rowidx*mat.width + j] * constant) % GF_PRIME_MODULUS;
     }
-
-    gfp_destroy(temp);
 
     return 1;
 }
@@ -803,16 +689,12 @@ int gfpm_fliprows( gfpmatrix mat, unsigned  int destrow, unsigned  int sourcerow
     unsigned  int j;
     gfp_element a;
 
-    a = gfp_init(1);
-
     for( j = 0 ; j < mat.width ; ++j )
     {
-        gfp_copy(&a, mat.data[destrow*mat.width + j]);
-        gfp_copy(&mat.data[destrow*mat.width + j], mat.data[sourcerow*mat.width + j]);
-        gfp_copy(&mat.data[sourcerow*mat.width + j], a);
+        a = mat.data[destrow*mat.width + j];
+        mat.data[destrow*mat.width + j] = mat.data[sourcerow*mat.width + j];
+        mat.data[sourcerow*mat.width + j] = a;
     }
-
-    gfp_destroy(a);
 
     return 1;
 }
@@ -831,9 +713,6 @@ int gfpm_redech( gfpmatrix mat )
     unsigned  int col, row, i;
     gfp_element inv;
     gfp_element diff;
-
-    inv = gfp_init(1);
-    diff = gfp_init(1);
 
     row = 0;
     for( col = 0 ; col < mat.width ; ++col )
@@ -879,9 +758,6 @@ int gfpm_redech( gfpmatrix mat )
         }
     }
 
-    gfp_destroy(inv);
-    gfp_destroy(diff);
-
     return 1;
 }
 
@@ -907,7 +783,6 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
 {
     /* declare variables for echelon reduction */
     unsigned  int col, row, i, j;
-    gfp_element inv, zero, one, minusone, neg;
     gfpmatrix mat;
 
     /* declare variables for pivot tracking */
@@ -917,15 +792,7 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
     unsigned  int num_npivots;
     int have_solution;
 
-    inv = gfp_init(1);
-    zero = gfp_init(1);
-    one = gfp_init(1);
-    minusone = gfp_init(1);
-    neg = gfp_init(1);
-
-    gfp_zero(&zero);
-    gfp_one(&one);
-    gfp_negate(&minusone, one);
+    gfp_element neg, inv;
 
     /* initialize variables for pivot tracking */
     num_pivots = 0;
@@ -940,12 +807,12 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
     {
         for( j = 0 ; j < coeffs.width ; ++j )
         {
-            gfp_copy(&mat.data[i*mat.width + j], coeffs.data[i*coeffs.width + j]);
+            mat.data[i*mat.width + j] = coeffs.data[i*coeffs.width + j];
         }
     }
     for( i = 0 ; i < mat.height ; ++i )
     {
-        gfp_copy(&mat.data[i*mat.width + mat.width - 1], target.data[i*target.width + 0]);
+        mat.data[i*mat.width + mat.width - 1] = target.data[i*target.width + 0];
     }
 
     /* perform row echelon reduction */
@@ -955,7 +822,7 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
         for( i = row ; i < mat.height ; ++i )
         {
             /* if the leading element is different from zero, use it as pivot element */
-            if( gfp_compare(mat.data[i*mat.width + col], zero) != 1 )
+            if( mat.data[i*mat.width + col] != 0 )
             {
                 if( i != row )
                 {
@@ -978,7 +845,7 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
         gfp_inverse(&inv, mat.data[row*mat.width + col]);
         
         /* rescale row if necessary */
-        if( gfp_compare(inv, one) != 1 )
+        if( inv != 1 )
         {
             gfpm_scalerow(mat, row, inv);
         }
@@ -1010,13 +877,13 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
     have_solution = (pivots[num_pivots-1] != mat.width-1);
     for( i = 0 ; i < mat.width-1 ; ++i )
     {
-        gfp_zero(&solution.data[i*solution.width]);
+        solution.data[i*solution.width] = 0;
     }
     if( have_solution == 1 )
     {
         for( i = 0 ; i < num_pivots ; ++i )
         {
-            gfp_copy(&solution.data[pivots[i]*solution.width], mat.data[i*mat.width + mat.width - 1]);
+            solution.data[pivots[i]*solution.width] = mat.data[i*mat.width + mat.width - 1];
         }
     }
 
@@ -1027,10 +894,10 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
         gfpm_zeros(*kernel);
         for( j = 0 ; j < num_npivots-1 ; ++j )
         {
-            gfp_copy(&(kernel->data[npivots[j]*kernel->width + j]), minusone);
+            kernel->data[npivots[j]*kernel->width + j] = GF_PRIME_MODULUS - 1;
             for( i = 0 ; i < num_pivots && pivots[i] < npivots[j] ; ++i )
             {
-                gfp_copy(&(kernel->data[pivots[i]*kernel->width + j]), mat.data[i*mat.width + npivots[j]]);
+                kernel->data[pivots[i]*kernel->width + j] = mat.data[i*mat.width + npivots[j]];
             }
         }
     }
@@ -1043,12 +910,6 @@ int gfpm_solve( gfpmatrix coeffs, gfpmatrix target, gfpmatrix solution, gfpmatri
     gfpm_destroy(mat);
     free(pivots);
     free(npivots);
-
-    gfp_destroy(inv);
-    gfp_destroy(zero);
-    gfp_destroy(one);
-    gfp_destroy(minusone);
-    gfp_destroy(neg);
 
     return have_solution;
 }
@@ -1214,9 +1075,9 @@ int gfpm_inverse( gfpmatrix inv, gfpmatrix mat )
     {
         for( j = 0 ; j < inv.width ; ++j )
         {
-            gfp_zero(&inv.data[i*inv.width + j]);
+            inv.data[i*inv.width + j] = 0;
         }
-        gfp_one(&inv.data[i*inv.width + i]);
+        inv.data[i*inv.width + i] = 1;
     }
 
     /* Concatenate mat with identity */
@@ -1231,7 +1092,7 @@ int gfpm_inverse( gfpmatrix inv, gfpmatrix mat )
     invertible = 1;
     for( i = 0 ; i < inv.height ; ++i )
     {
-        invertible = invertible & gfp_is_one(concat.data[i*concat.width + i]);
+        invertible = invertible & (concat.data[i*concat.width + i] == 1);
     }
 
     if( 0 == invertible )
@@ -1245,7 +1106,7 @@ int gfpm_inverse( gfpmatrix inv, gfpmatrix mat )
     {
         for( j = 0 ; j < inv.width ; ++j )
         {
-            gfp_copy(&inv.data[i*inv.width + j], concat.data[i*concat.width + mat.width + j]);
+            inv.data[i*inv.width + j] = concat.data[i*concat.width + mat.width + j];
         }
     }
 
