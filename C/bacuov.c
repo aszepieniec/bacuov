@@ -64,7 +64,7 @@ void bacuov_generate_vinegar_coefficients( gfpcircmatrix * Pi0V0V, unsigned char
     unsigned char randomness[SECURITY_LEVEL/4 + 8];
     int i, j, k, K;
     int type;
-    gfpcirc_element elm;
+    unsigned char ch;
     unsigned char buffer[GFP_NUMBYTES*DEGREE_OF_CIRCULANCY * (BACUOV_PARAM_V * (BACUOV_PARAM_V + 1) / 2)];
     
     // copy over randomness
@@ -97,12 +97,12 @@ void bacuov_generate_vinegar_coefficients( gfpcircmatrix * Pi0V0V, unsigned char
         {
 			for( k = 0 ; k < DEGREE_OF_CIRCULANCY ; ++k )
 			{
-            	elm.data[k] = buffer[K + k] % GF_PRIME_MODULUS;
+            	ch = buffer[K + k] % GF_PRIME_MODULUS;
+                Pi0V0V->data[j*BACUOV_PARAM_V + i].data[k] = ch;
+                Pi0V0V->data[i*BACUOV_PARAM_V + j].data[k] = ch;
 			}
 			K = K + DEGREE_OF_CIRCULANCY;
-            // divide elm by 2? not necessary
-            gfpcirc_copy(&Pi0V0V->data[i*BACUOV_PARAM_V+j], &elm);
-            gfpcirc_copy(&Pi0V0V->data[j*BACUOV_PARAM_V+i], &elm);
+            // divide ch by 2? not necessary
         }
     }
 }
@@ -117,6 +117,7 @@ void bacuov_generate_linear_coefficients( gfpcircmatrix * Pi0VVN, unsigned char 
     unsigned char randomness[SECURITY_LEVEL/4 + 8];
     int type;
     int i, j, k;
+    int iOj;
     gfpcirc_element elm;
     unsigned char buffer[sizeof(gfpcirc_element) * (BACUOV_PARAM_V * BACUOV_PARAM_O)];
     
@@ -142,9 +143,10 @@ void bacuov_generate_linear_coefficients( gfpcircmatrix * Pi0VVN, unsigned char 
     {
         for( j = 0 ; j < BACUOV_PARAM_O ; ++j )
         {
+            iOj = i*BACUOV_PARAM_O + j;
             for( k = 0 ; k < DEGREE_OF_CIRCULANCY ; ++k )
             {
-            	Pi0VVN->data[i*BACUOV_PARAM_O+j].data[k] = buffer[(i*BACUOV_PARAM_O+j)*DEGREE_OF_CIRCULANCY + k] % GF_PRIME_MODULUS;
+            	Pi0VVN->data[iOj].data[k] = buffer[iOj*DEGREE_OF_CIRCULANCY + k] % GF_PRIME_MODULUS;
             }
         }
     }
@@ -581,27 +583,23 @@ void bacuov_sign( bacuov_signature * sig, bacuov_secret_key sk, const unsigned c
     gfpem_destroy(update);
 }
 
-#define BAC_GET(mat, i, j) (mat.data[(i/DEGREE_OF_CIRCULANCY)*mat.width + (j/DEGREE_OF_CIRCULANCY)].data[(j+i) % DEGREE_OF_CIRCULANCY])
-
 int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len, bacuov_signature * sig )
 {
     gfpcircmatrix Pi0V0V, Pi0VVN;
-    gfpmatrix Pi0V0V_pressed, Pi0VVN_pressed, PiVNVN_pressed;
     gfpematrix evaluation, target;
     unsigned long int inner_product_integers[EXTENSION_DEGREE];
-    unsigned long int temp_row_integers[(BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY*EXTENSION_DEGREE];
+    unsigned long int temp_row_integers[(BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY*EXTENSION_DEGREE];   
+    unsigned char jth_row[(BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY];
+    unsigned char circ_element[DEGREE_OF_CIRCULANCY];
     gfpe_element ext_elm;
     gfpematrix signature;
     int valid;
-    int i, j, k, l, m;
+    int i, j, k, l, m, J, K, jj, kk;
     unsigned char array[BACUOV_PARAM_O*DEGREE_OF_CIRCULANCY * EXTENSION_DEGREE];
 
     // init matrices
     Pi0V0V = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_V);
     Pi0VVN = gfpcircm_init(BACUOV_PARAM_V, BACUOV_PARAM_O);
-    Pi0V0V_pressed = gfpm_init(BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY, BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY);
-    Pi0VVN_pressed = gfpm_init(BACUOV_PARAM_V * DEGREE_OF_CIRCULANCY, BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY);
-    PiVNVN_pressed = gfpm_init(BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY, BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY);
     evaluation = gfpem_init(BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY, 1);
     target = gfpem_init(BACUOV_PARAM_O * DEGREE_OF_CIRCULANCY, 1);
     signature = gfpem_init((BACUOV_PARAM_V+BACUOV_PARAM_O) * DEGREE_OF_CIRCULANCY, 1);
@@ -619,50 +617,88 @@ int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len,
         bacuov_generate_vinegar_coefficients(&Pi0V0V, pk.seed_PCT, i);
         bacuov_generate_linear_coefficients(&Pi0VVN, pk.seed_PCT, i);
 
-        // press down matrix parts // possible optimization: grab elements immediately from unpressed bac-form // actually, I tried that. It's slower.
-        gfpcircm_press_anticirculant(&Pi0V0V_pressed, Pi0V0V);
-        gfpcircm_press_anticirculant(&Pi0VVN_pressed, Pi0VVN);
-        gfpcircm_press_anticirculant(&PiVNVN_pressed, pk.PPoo[i]);
-
         // compute matrix-vector product sig^T * P[i] 
-	    for( j = 0 ; j < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++j )
+        for( j = 0 ; j < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++j )
         {
             for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
             {
                 temp_row_integers[j*EXTENSION_DEGREE + m] = 0;
             }
-	    }
-        for( j = 0 ; j < BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; ++j )
-        {
-            for( k = 0 ; k < (BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
-            {
-                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
-                {
-                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * Pi0V0V_pressed.data[j*Pi0V0V_pressed.width + k];
-                }
-            }
-            for( k = BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; k < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
-            {
-                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
-                {
-                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * Pi0VVN_pressed.data[j*Pi0VVN_pressed.width + k - BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY];
-                }
-            }
         }
-        for( j = BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; j < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++j )
+        //for( j = 0 ; j < (BACUOV_PARAM_V+BACUOV_PARAM_O)*DEGREE_OF_CIRCULANCY ; ++j )
+        for( J = 0 ; J < (BACUOV_PARAM_V+BACUOV_PARAM_O) ; ++J )
         {
-            for( k = 0 ; k < (BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
+            for( jj = 0 ; jj < DEGREE_OF_CIRCULANCY ; ++jj )
             {
-                for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+
+                j = J * DEGREE_OF_CIRCULANCY + jj;
+
+                if( jj == 0 )
                 {
-                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * Pi0VVN_pressed.data[k*Pi0VVN_pressed.width + j - BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY];
+                     if( J < BACUOV_PARAM_V )
+                     {
+                         for( K = 0 ; K < BACUOV_PARAM_V ; ++K )
+                         {
+                             for( kk = 0 ; kk < DEGREE_OF_CIRCULANCY ; ++kk )
+                             {
+                                jth_row[K * DEGREE_OF_CIRCULANCY + kk] = Pi0V0V.data[J*Pi0V0V.width + K].data[DEGREE_OF_CIRCULANCY-1 - kk];
+                             }
+                         }
+                         for( K = BACUOV_PARAM_V ; K < (BACUOV_PARAM_O+BACUOV_PARAM_V) ; ++K )
+                         {
+                             for( kk = 0 ; kk < DEGREE_OF_CIRCULANCY ; ++kk )
+                             {
+                                jth_row[K * DEGREE_OF_CIRCULANCY + kk] = Pi0VVN.data[J*Pi0VVN.width + K - BACUOV_PARAM_V].data[DEGREE_OF_CIRCULANCY-1 - kk];
+                             }
+                         }
+                     }
+                     else
+                     {
+                         for( K = 0 ; K < BACUOV_PARAM_V ; ++K )
+                         {
+                             for( kk = 0 ; kk < DEGREE_OF_CIRCULANCY ; ++kk )
+                             {
+                                 jth_row[K * DEGREE_OF_CIRCULANCY + kk] = Pi0VVN.data[K*Pi0VVN.width + J - BACUOV_PARAM_V].data[DEGREE_OF_CIRCULANCY-1 - kk];
+                             }
+                         }
+                         for( K = BACUOV_PARAM_V ; K < (BACUOV_PARAM_O+BACUOV_PARAM_V) ; ++K )
+                         {
+                             for( kk = 0 ; kk < DEGREE_OF_CIRCULANCY ; ++kk )
+                             {
+                                 jth_row[K * DEGREE_OF_CIRCULANCY + kk] = pk.PPoo[i].data[(J-BACUOV_PARAM_V)*pk.PPoo[i].width + K - BACUOV_PARAM_V].data[DEGREE_OF_CIRCULANCY-1 - kk];
+                             }
+                         }
+                     }
                 }
-            }
-            for( k = BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY ; k < (BACUOV_PARAM_O+BACUOV_PARAM_V)*DEGREE_OF_CIRCULANCY ; ++k )
-            {
+                // else, shift by -1 mod DEGREE_OF_CIRCULANCY
+                else
+                {
+                    for( l = 0 ; l < BACUOV_PARAM_V + BACUOV_PARAM_O ; ++l )
+                    {
+                        // copy circ element
+                        for( k = 0 ; k < DEGREE_OF_CIRCULANCY ; ++k )
+                        {
+                            circ_element[k] = jth_row[l*DEGREE_OF_CIRCULANCY + k];
+                        }
+                        // copy back, shifted
+                        for( k = 0 ; k < DEGREE_OF_CIRCULANCY - 1 ; ++k )
+                        {
+                            jth_row[l*DEGREE_OF_CIRCULANCY + k] = circ_element[k+1];
+                        }
+                        jth_row[l*DEGREE_OF_CIRCULANCY + DEGREE_OF_CIRCULANCY-1] = circ_element[0];
+                    }
+                }
+                // use row to compute inner product
                 for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
                 {
-                    temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * PiVNVN_pressed.data[(j-BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY)*PiVNVN_pressed.width + k - BACUOV_PARAM_V*DEGREE_OF_CIRCULANCY];
+                    temp_row_integers[j*EXTENSION_DEGREE + m] = 0;
+                } // merging these loops doesn't seem to improve performance ...
+                for( k = 0 ; k < (BACUOV_PARAM_V + BACUOV_PARAM_O) * DEGREE_OF_CIRCULANCY ; ++k )
+                {
+                    for( m = 0 ; m < EXTENSION_DEGREE ; ++m )
+                    {
+                        temp_row_integers[j*EXTENSION_DEGREE + m] = temp_row_integers[j*EXTENSION_DEGREE + m] + signature.data[k].data[m] * jth_row[k];
+                    }
                 }
             }
         }
@@ -707,9 +743,6 @@ int bacuov_verify( bacuov_public_key pk, const unsigned char * msg, int msg_len,
     // destroy matrices
     gfpcircm_destroy(Pi0V0V);
     gfpcircm_destroy(Pi0VVN);
-    gfpm_destroy(Pi0V0V_pressed);
-    gfpm_destroy(Pi0VVN_pressed);
-    gfpm_destroy(PiVNVN_pressed);
     gfpem_destroy(evaluation);
     gfpem_destroy(target);
     gfpem_destroy(signature);

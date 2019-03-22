@@ -70,7 +70,7 @@ int gfpe_one( gfpe_element* elm )
 int gfpe_random( gfpe_element* elm, unsigned char * randomness )
 {
     int j;
-    unsigned long int r = 0; /* TODO: invoke big integer help if necessary */
+    unsigned long int r = 0; 
     for( j = 0 ; j < EXTENSION_DEGREE * GFP_NUMBYTES ; ++j )
     {
         r = r * 256 + randomness[j];
