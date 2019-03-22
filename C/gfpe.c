@@ -5,7 +5,7 @@
 
 #if GFP_NUMBYTES <= 4
 
-gfpx gfpe_init_defining_polynomial()
+gfpx gfpe_init_defining_polynomial( )
 {
     int i;
     gfpx elm;
@@ -158,8 +158,7 @@ int gfpe_negate( gfpe_element * res, gfpe_element elm )
 
 int gfpe_multiply( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
 {
-    gfpx product;
-    gfpx rem, quo, defpoly;
+    unsigned int product[2*EXTENSION_DEGREE+1];
     int i, j;
 
     if( gfpe_is_zero(lhs) || gfpe_is_zero(rhs) )
@@ -168,45 +167,30 @@ int gfpe_multiply( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
         return 1;
     }
 
-    product = gfpx_init(2*EXTENSION_DEGREE);
-
     for( i = 0 ; i <= 2*EXTENSION_DEGREE ; ++i )
     {
-        product.data[i] = 0;
+        product[i] = 0;
     }
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
         for( j = 0 ; j < EXTENSION_DEGREE ; ++j )
         {
-            product.data[i+j] = (product.data[i+j] + (lhs.data[i] * rhs.data[j])) % GF_PRIME_MODULUS;
+            product[i+j] = (product[i+j] + (lhs.data[i] * rhs.data[j]));
         }
     }
-    product.degree = 2*EXTENSION_DEGREE;
 
-    // reduce modulo DEFINING_POLYNOMIAL
-    rem = gfpx_init(0);
-    quo = gfpx_init(0);
-    defpoly = gfpe_init_defining_polynomial();
-    gfpx_divide(&quo, &rem, product, defpoly);
-    
-    // copy rem over
+    // reduce
+    for( i = 2*EXTENSION_DEGREE ; i >= EXTENSION_DEGREE ; --i )
+    {
+        for( j = 0 ; j < EXTENSION_DEGREE ; ++j )
+        {
+            product[i-EXTENSION_DEGREE + j] = (GF_PRIME_MODULUS + product[i-EXTENSION_DEGREE + j] - (product[i] * ((DEFINING_POLYNOMIAL >> (8*j)) & 0xff) % GF_PRIME_MODULUS));
+        }
+    }
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        if( i <= rem.degree )
-        {
-            res->data[i] = rem.data[i];
-        }
-        else
-        {
-            res->data[i] = 0;
-        }
+        res->data[i] = product[i] % GF_PRIME_MODULUS;
     }
-
-    // free allocated data
-    gfpx_destroy(product);
-    gfpx_destroy(rem);
-    gfpx_destroy(quo);
-    gfpx_destroy(defpoly);
 
     return 1;
 }
