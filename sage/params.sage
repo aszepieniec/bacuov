@@ -49,7 +49,7 @@ def params_luov( q, v, o, r ):
     c, k = quantum_hybrid(q, v, v)
     print "UOV Reconciliation:", c, "with k =", k
 
-def params_bac( q, V, O, l, r ):
+def params_bac( q, V, O, l, r, verbose=False ):
     v = V * l
     o = O * l
     m = o
@@ -66,7 +66,6 @@ def params_bac( q, V, O, l, r ):
     Fx.<x> = PolynomialRing(FiniteField(q), "x")
     factorization = (x^l - 1).factor()
     maxdeg = max(f.degree() for (f, m) in factorization)
-
     
     c, k = quantum_hybrid(q^maxdeg, max(V,m), V)
     uov_reconciliation = c
@@ -91,13 +90,13 @@ def sweep_bac(qq, VV, OO, ll, rr, sec_lvl):
     params_list = []
     
     for q in qq:
-        print "q:", q
+        #print "q:", q
         for V in VV:
-            print "V:", V
+            #print "V:", V
             for O in OO:
-                print "O:", O
+                #print "O:", O
                 for l in ll:
-                    print "l:", l
+                    #print "l:", l
                     for r in rr:
                         params = params_bac(q, V, O, l, r)
                         if params[2] > sec_lvl and params[3] > sec_lvl and params[4] > sec_lvl:
@@ -108,4 +107,5 @@ def sweep_bac(qq, VV, OO, ll, rr, sec_lvl):
     for elm in sorted_list[0:10]:
         print elm, "(", 1.0*(elm[5][0] + elm[5][1])/8/1024, "kB)"
 
+    return sorted_list
 
