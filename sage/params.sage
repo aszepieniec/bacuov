@@ -109,3 +109,34 @@ def sweep_bac(qq, VV, OO, ll, rr, sec_lvl):
 
     return sorted_list
 
+def compiler_definitions( q, V, O, l, r ):
+    num_bits = ceil(log(1.0*q, 2.0))
+    Fq = FiniteField(q)
+    
+    # get lexicographically the first irreducible polynomial
+    Fx.<x> = PolynomialRing(Fq, "x")
+    for integer in range(0, q^r):
+        expansion = []
+        intgr = copy(integer)
+        while intgr != 0:
+            expansion.append(intgr % q)
+            intgr = intgr // q
+        while len(expansion) != r:
+            expansion.append(Fq(0))
+        poly = x^r + sum([x^i * expansion[i] for i in range(0,r)])
+        if poly.is_irreducible():
+            break
+
+    # get hex expansion of defining polynomial
+    hexpansion = ""
+    coeffs = poly.coefficients(sparse=False)
+    for i in range(0,r):
+        h = hex(int(coeffs[i]))[2:]
+        if len(h) == 1:
+            h = "0" + h
+        hexpansion = h + hexpansion
+    hexpansion = "0x" + hexpansion
+
+    # print compiler definitions
+    print "-DGF_PRIME_MODULUS=%i -DGFP_NUMBITS=%i -DEXTENSION_DEGREE=%i -DDEFINING_POLYNOMIAL=%s -DDEGREE_OF_CIRCULANCY=%i -DBACUOV_PARAM_O=%i -DBACUOV_PARAM_V=%i" % (q, num_bits, r, hexpansion, l, O, V)
+
