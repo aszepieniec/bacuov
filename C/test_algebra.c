@@ -28,6 +28,8 @@ int test_gfpe_inverse( unsigned long int * rand )
     //    verbose = 1;
     //}
 
+    *rand = 8394082536943336941;
+
     FIPS202_SHAKE256((unsigned char *)rand, sizeof(unsigned long int), buff, 100);
 
     printf("testing gfpe inverse with randomness %lu ... ", *rand);
@@ -50,7 +52,6 @@ int test_gfpe_inverse( unsigned long int * rand )
 
     gfpe_inverse(&ainv, a);
     gfpe_inverse(&binv, b);
-
 
     gfpe_multiply(&cc, ainv, binv);
 

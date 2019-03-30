@@ -13,7 +13,7 @@ gfpx gfpe_init_defining_polynomial( )
     elm.degree = EXTENSION_DEGREE;
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )
     {
-        elm.data[i] = (DEFINING_POLYNOMIAL >> (8*i)) & 0xff;
+        elm.data[i] = DEFINING_POLYNOMIAL[i];
     }
     elm.data[EXTENSION_DEGREE] = 0x01;
     return elm;
@@ -184,7 +184,7 @@ int gfpe_multiply( gfpe_element * res, gfpe_element lhs, gfpe_element rhs )
     {
         for( j = 0 ; j < EXTENSION_DEGREE ; ++j )
         {
-            product[i-EXTENSION_DEGREE + j] = (GF_PRIME_MODULUS + product[i-EXTENSION_DEGREE + j] - (product[i] * ((DEFINING_POLYNOMIAL >> (8*j)) & 0xff) % GF_PRIME_MODULUS));
+            product[i-EXTENSION_DEGREE + j] = (GF_PRIME_MODULUS + product[i-EXTENSION_DEGREE + j] - (product[i] * DEFINING_POLYNOMIAL[j]) % GF_PRIME_MODULUS);
         }
     }
     for( i = 0 ; i < EXTENSION_DEGREE ; ++i )

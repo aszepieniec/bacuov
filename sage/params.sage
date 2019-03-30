@@ -78,7 +78,7 @@ def params_bac( q, V, O, l, r, verbose=False ):
         print "Direct Algebraic:", direct_algebraic
         print "Kipnis-Shamir (conservative):", log(1.0 * q^(V-O), 2.0) / 2
         c, k = quantum_hybrid(q, max(V,m), V)
-        print "UOV Reconciliation (aggressive):", c
+        print "UOV Reconciliation (conservative):", c
         print "factorization:", factorization
         print "max degree:", maxdeg
         print "UOV Reconciliation (aggressive):", uov_reconciliation
@@ -112,10 +112,10 @@ def sweep_bac(qq, VV, OO, ll, rr, sec_lvl):
 def compiler_definitions( q, V, O, l, r ):
     num_bits = ceil(log(1.0*q, 2.0))
     Fq = FiniteField(q)
-    
+
     # get lexicographically the first irreducible polynomial
     Fx.<x> = PolynomialRing(Fq, "x")
-    for integer in range(0, q^r):
+    for integer in range(0, min(q^r,1000)):
         expansion = []
         intgr = copy(integer)
         while intgr != 0:
@@ -134,9 +134,8 @@ def compiler_definitions( q, V, O, l, r ):
         h = hex(int(coeffs[i]))[2:]
         if len(h) == 1:
             h = "0" + h
-        hexpansion = h + hexpansion
-    hexpansion = "0x" + hexpansion
+        hexpansion += "\\x" + h
 
     # print compiler definitions
-    print "-DGF_PRIME_MODULUS=%i -DGFP_NUMBITS=%i -DEXTENSION_DEGREE=%i -DDEFINING_POLYNOMIAL=%s -DDEGREE_OF_CIRCULANCY=%i -DBACUOV_PARAM_O=%i -DBACUOV_PARAM_V=%i" % (q, num_bits, r, hexpansion, l, O, V)
+    print "-DGF_PRIME_MODULUS=%i -DGFP_NUMBITS=%i -DEXTENSION_DEGREE=%i -DDEFINING_POLYNOMIAL=\"\\\"%s\\\"\" -DDEGREE_OF_CIRCULANCY=%i -DBACUOV_PARAM_O=%i -DBACUOV_PARAM_V=%i" % (q, num_bits, r, hexpansion, l, O, V)
 
